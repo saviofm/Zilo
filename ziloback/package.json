@@ -1,0 +1,45 @@
+{
+  "name": "ziloback",
+  "version": "1.0.0",
+  "description": "Zilo — CAP backend for AI assistant + admin UI",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "cds-serve",
+    "dev": "cds watch",
+    "build": "cds build --production"
+  },
+  "dependencies": {
+    "@sap-ai-sdk/core": "^2.11.0",
+    "@sap/cds": "^8",
+    "@sap/hana-client": "^2",
+"@sap/xssec": "^4",
+    "axios": "^1.18.1",
+    "express": "^4"
+  },
+  "devDependencies": {
+    "@sap/cds-dk": "^8",
+    "cds-plugin-ui5": "^0.17.3"
+  },
+  "cds": {
+    "requires": {
+      "auth": {
+        "kind": "xsuaa"
+      },
+      "db": {
+        "kind": "hana"
+      },
+      "destinations": true,
+      "html5-runtime": true,
+      "workzone": true
+    },
+    "features": {
+      "xssec_compat": true
+    },
+    "log": {
+      "format": "json"
+    }
+  }
+}

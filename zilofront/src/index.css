@@ -1,0 +1,140 @@
+@import "tailwindcss";
+
+/* ── Zilor Design Tokens ── */
+:root {
+  /* Brand / Zilor green */
+  --joule:              #01502D;
+  --joule-hover:        #005a33;
+  --joule-pressed:      #003d22;
+  --joule-bg:           #e8f5e9;   /* active item bg, tooltip bg */
+  --joule-bg-light:     #c8e6c9;   /* hover on active */
+
+  /* Text */
+  --text-primary:       #2D2D2D;
+  --text-secondary:     #353c4a;
+  --text-muted:         #707070;
+  --text-disabled:      #b5bcca;
+  --text-link:          #01502D;
+
+  /* Backgrounds */
+  --bg-page:            #FFFFFF;   /* main content white */
+  --bg-shell:           #F0F0F0;   /* sidebar / shell */
+  --bg-secondary:       #f0f2f4;
+  --bg-hover:           #f0f2f4;
+
+  /* Borders */
+  --border:             #e6e7ea;
+  --border-active:      #7c879c;
+  --border-focus:       #01502D;
+
+  /* User message bubble — light green tint */
+  --bubble-user:        #e8f5e9;
+
+  /* Avatar */
+  --avatar-bg:          #c8e6c9;
+  --avatar-text:        #01502D;
+
+  /* Progress bar gradient */
+  --progress-grad: linear-gradient(to right, #8CC63E, #01502D);
+
+  /* Shadows */
+  --shadow-card: 0 1px 3px rgba(0,0,0,0.07), 0 1px 2px rgba(0,0,0,0.04);
+}
+
+/* ── Reset ── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  height: 100%;
+  font-family: 'Inter', '72', system-ui, -apple-system, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text-primary);
+  background: var(--bg-shell);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#root { height: 100vh; display: flex; overflow: hidden; }
+
+/* ── Typography ── */
+h1, h2, h3, h4, h5 { font-weight: 600; color: var(--text-primary); }
+a { color: var(--text-link); text-decoration: none; }
+a:hover { text-decoration: underline dotted; }
+button { font-family: inherit; cursor: pointer; }
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar       { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 99px; }
+::-webkit-scrollbar-thumb:hover { background: #9ca3af; }
+
+/* ── Animations ── */
+@keyframes progressFill {
+  from { width: 4%; }
+  to   { width: 100%; }
+}
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes tooltipSlide {
+  from { opacity: 0; transform: translateX(-8px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+.animate-progress    { animation: progressFill 2.8s ease-out forwards; }
+.animate-fade-in-up  { animation: fadeInUp 0.3s ease forwards; opacity: 0; }
+.animate-spin-custom { animation: spin 0.85s linear infinite; }
+.animate-fade-in     { animation: fadeIn 0.18s ease forwards; }
+.animate-tooltip     { animation: tooltipSlide 0.16s ease forwards; }
+
+/* Streaming dots */
+@keyframes streamingBounce {
+  0%, 80%, 100% { transform: translateY(0); opacity: 0.4; }
+  40%            { transform: translateY(-4px); opacity: 1; }
+}
+.streaming-dot {
+  display: inline-block;
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  background: var(--joule);
+  animation: streamingBounce 1.2s ease-in-out infinite;
+}
+
+/* Blinking cursor at end of streaming text */
+@keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+.streaming-cursor::after {
+  content: '▋';
+  display: inline-block;
+  color: var(--joule);
+  animation: blink 0.8s step-end infinite;
+  margin-left: 1px;
+  font-size: 0.85em;
+  vertical-align: baseline;
+}
+
+/* ── Sidebar ── */
+.sidebar-transition  { transition: width 0.4s cubic-bezier(0.32, 0.72, 0, 1); }
+
+/* Nav item hover */
+.nav-item { transition: background 0.12s ease; }
+.nav-item:hover { background: var(--bg-hover) !important; }
+
+/* ── Utility: surface card ── */
+.card {
+  background: var(--bg-page);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow-card);
+}
+
+/* ── Input focus ring override ── */
+textarea:focus, input:focus { outline: none; }

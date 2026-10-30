@@ -1,0 +1,6 @@
+module,cuPerRequest,description
+contentFilter,0.0003,Azure Content Safety — por bloco (1k chars)
+grounding,0.0005365,DMS Vector Search — por query
+dataMasking,0.00118,SAP DPI pseudonymization — por request
+translation,0.00162,Translation module — por request
+inferenceObservability,0.00089,Inference Observability — por request

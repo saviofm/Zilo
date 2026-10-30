@@ -1,0 +1,59 @@
+{
+  "xsappname": "ziloback",
+  "tenant-mode": "dedicated",
+  "description": "XSUAA for Zilo — AI assistant platform",
+  "scopes": [
+    {
+      "name": "$XSAPPNAME.ZiloAdmin",
+      "description": "Full admin access — manage orchestrations, policies, users"
+    },
+    {
+      "name": "$XSAPPNAME.ZiloUser",
+      "description": "Standard end-user access — chat and view own consumption"
+    }
+  ],
+  "role-templates": [
+    {
+      "name": "ZiloAdmin",
+      "description": "Zilo platform administrator",
+      "scope-references": [
+        "$XSAPPNAME.ZiloAdmin",
+        "$XSAPPNAME.ZiloUser"
+      ]
+    },
+    {
+      "name": "ZiloUser",
+      "description": "Zilo end user",
+      "scope-references": [
+        "$XSAPPNAME.ZiloUser"
+      ]
+    }
+  ],
+  "role-collections": [
+    {
+      "name": "Zilo Admin",
+      "description": "Assign to users who manage orchestrations, policies and users",
+      "role-template-references": [
+        "$XSAPPNAME.ZiloAdmin"
+      ]
+    },
+    {
+      "name": "Zilo User",
+      "description": "Assign to users who access the Zilo chat",
+      "role-template-references": [
+        "$XSAPPNAME.ZiloUser"
+      ]
+    }
+  ],
+  "authorities": [
+    "$ACCEPT_GRANTED_AUTHORITIES"
+  ],
+  "oauth2-configuration": {
+    "token-validity": 43200,
+    "refresh-token-validity": 2592000,
+    "redirect-uris": [
+      "https://*.hana.ondemand.com/**",
+      "https://*.launchpad.cfapps.us10.hana.ondemand.com/**"
+    ]
+  }
+}

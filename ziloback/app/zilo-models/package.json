@@ -1,0 +1,11 @@
+{
+  "name": "zilo-models",
+  "version": "1.0.0",
+  "scripts": {
+    "build:cf": "ui5 build --config ui5-deploy.yaml --clean-dest --dest dist"
+  },
+  "devDependencies": {
+    "@ui5/cli": "^4",
+    "ui5-task-zipper": "^3"
+  }
+}

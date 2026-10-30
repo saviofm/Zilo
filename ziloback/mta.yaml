@@ -1,0 +1,237 @@
+_schema-version: "3.1"
+ID: ziloback
+version: 1.0.0
+description: Zilo — CAP backend + admin UI for AI assistant platform
+
+parameters:
+  enable-parallel-deployments: true
+  deploy_mode: html5-repo
+
+build-parameters:
+  before-all:
+    - builder: custom
+      commands:
+        - npx cds build --production
+
+modules:
+
+  # ── CAP service ──────────────────────────────────────────────────────────────
+  - name: ziloback-srv
+    type: nodejs
+    path: gen/srv
+    parameters:
+      buildpack: nodejs_buildpack
+      memory: 512M
+      disk-quota: 1024M
+      instances: 2
+      health-check-type: http
+      health-check-http-endpoint: /health
+    properties:
+      SAP_JWT_TRUST_ACL: '[{"clientid":"*","identityzone":"*","accept":true}]'
+      AICORE_RESOURCE_GROUP: default
+      cds_requires_auth_credentials_skipValidation: true
+    build-parameters:
+      builder: npm
+    requires:
+      - name: zilo-hdi
+      - name: zilo-xsuaa
+      - name: aicore-default
+      - name: zilo-dest
+    provides:
+      - name: srv-api
+        properties:
+          srv-url: ${default-url}
+
+  # ── Destination content ───────────────────────────────────────────────────────
+  - name: ziloback-dest-content
+    type: com.sap.application.content
+    path: .
+    requires:
+      - name: zilo-xsuaa
+        parameters:
+          service-key:
+            name: zilo-xsuaa-key
+      - name: zilo-html5repo
+        parameters:
+          service-key:
+            name: zilo-html5repo-key
+      - name: srv-api
+      - name: zilo-dest
+        parameters:
+          content-target: true
+    parameters:
+      content:
+        subaccount:
+          destinations:
+            - Name: zilo-html5repo
+              ServiceInstanceName: zilo-html5repo
+              ServiceKeyName: zilo-html5repo-key
+              sap.cloud.service: ziloadmin
+            - Authentication: OAuth2UserTokenExchange
+              Name: zilo-xsuaa
+              ServiceInstanceName: zilo-xsuaa
+              ServiceKeyName: zilo-xsuaa-key
+              sap.cloud.service: ziloadmin
+          existing_destinations_policy: update
+    build-parameters:
+      no-source: true
+
+  # ── UI deployer ───────────────────────────────────────────────────────────────
+  - name: ziloback-ui-deployer
+    type: com.sap.application.content
+    path: .
+    requires:
+      - name: zilo-html5repo
+        parameters:
+          content-target: true
+    build-parameters:
+      build-result: resources
+      requires:
+        - name: zilo-admin-orchestrations
+          artifacts:
+            - zilo-orchestrations.zip
+          target-path: resources/
+        - name: zilo-admin-policies
+          artifacts:
+            - zilo-policies.zip
+          target-path: resources/
+        - name: zilo-admin-users
+          artifacts:
+            - zilo-users.zip
+          target-path: resources/
+        - name: zilo-admin-ledger
+          artifacts:
+            - zilo-ledger.zip
+          target-path: resources/
+        - name: zilo-admin-models
+          artifacts:
+            - zilo-models.zip
+          target-path: resources/
+
+  # ── Admin UI apps ─────────────────────────────────────────────────────────────
+  - name: zilo-admin-orchestrations
+    type: html5
+    path: app/zilo-orchestrations
+    build-parameters:
+      build-result: dist
+      builder: custom
+      commands:
+        - npm install
+        - npm run build:cf
+      supported-platforms: []
+
+  - name: zilo-admin-policies
+    type: html5
+    path: app/zilo-policies
+    build-parameters:
+      build-result: dist
+      builder: custom
+      commands:
+        - npm install
+        - npm run build:cf
+      supported-platforms: []
+
+  - name: zilo-admin-users
+    type: html5
+    path: app/zilo-users
+    build-parameters:
+      build-result: dist
+      builder: custom
+      commands:
+        - npm install
+        - npm run build:cf
+      supported-platforms: []
+
+  - name: zilo-admin-ledger
+    type: html5
+    path: app/zilo-ledger
+    build-parameters:
+      build-result: dist
+      builder: custom
+      commands:
+        - npm install
+        - npm run build:cf
+      supported-platforms: []
+
+  - name: zilo-admin-models
+    type: html5
+    path: app/zilo-models
+    build-parameters:
+      build-result: dist
+      builder: custom
+      commands:
+        - npm install
+        - npm run build:cf
+      supported-platforms: []
+
+  # ── HDI DB deployer ──────────────────────────────────────────────────────────
+  - name: ziloback-db-deployer
+    type: hdb
+    path: gen/db
+    parameters:
+      buildpack: nodejs_buildpack
+    requires:
+      - name: zilo-hdi
+
+resources:
+
+  - name: aicore-default
+    type: org.cloudfoundry.existing-service
+    parameters:
+      service-name: default_aicore
+
+  - name: zilo-hdi
+    type: com.sap.xs.hdi-container
+    parameters:
+      service: hana
+      service-plan: hdi-shared
+      service-key:
+        name: zilo-hdi-key
+
+  - name: zilo-xsuaa
+    type: org.cloudfoundry.managed-service
+    parameters:
+      service: xsuaa
+      service-plan: application
+      path: ./xs-security.json
+      config:
+        xsappname: ziloback-${org}-${space}
+        tenant-mode: dedicated
+
+  - name: zilo-html5repo
+    type: org.cloudfoundry.managed-service
+    parameters:
+      service: html5-apps-repo
+      service-plan: app-host
+      service-name: zilo-html5repo
+
+  - name: zilo-dest
+    type: org.cloudfoundry.managed-service
+    requires:
+      - name: srv-api
+    parameters:
+      service: destination
+      service-plan: lite
+      config:
+        HTML5Runtime_enabled: true
+        version: 1.0.0
+        init_data:
+          instance:
+            destinations:
+              - Authentication: NoAuthentication
+                Name: ui5
+                ProxyType: Internet
+                Type: HTTP
+                URL: https://ui5.sap.com
+              - Authentication: NoAuthentication
+                HTML5.DynamicDestination: "true"
+                HTML5.ForwardAuthToken: "true"
+                HTML5.Timeout: "60000"
+                Name: zilo-backend
+                ProxyType: Internet
+                Type: HTTP
+                URL: ~{srv-api/srv-url}
+            existing_destinations_policy: update
+
+  # zilo-jobscheduler omitted — subaccount quota exhausted (joule-work-jobscheduler exists)
+  # Add when quota is available or reuse joule-work-jobscheduler as existing-service

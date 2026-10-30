@@ -1,0 +1,180 @@
+{
+  "_version": "1.65.0",
+  "sap.app": {
+    "id": "ziloadminusers",
+    "type": "application",
+    "i18n": "i18n/i18n.properties",
+    "title": "{{appTitle}}",
+    "description": "{{appDescription}}",
+    "applicationVersion": {
+      "version": "1.0.0"
+    },
+    "dataSources": {
+      "AdminService": {
+        "uri": "api/admin/",
+        "type": "OData",
+        "settings": {
+          "odataVersion": "4.0"
+        }
+      }
+    },
+    "crossNavigation": {
+      "inbounds": {
+        "zilo_users_inbound": {
+          "semanticObject": "ZiloUsers",
+          "action": "manage",
+          "title": "{{appTitle}}",
+          "icon": "sap-icon://employees",
+          "signature": {
+            "parameters": {},
+            "additionalParameters": "allowed"
+          }
+        }
+      }
+    }
+  },
+  "sap.ui": {
+    "technology": "UI5",
+    "fullWidth": true,
+    "supportedThemes": [
+      "sap_horizon"
+    ],
+    "icons": {
+      "icon": "sap-icon://employees"
+    },
+    "deviceTypes": {
+      "desktop": true,
+      "tablet": true,
+      "phone": false
+    }
+  },
+  "sap.ui5": {
+    "flexEnabled": true,
+    "dependencies": {
+      "minUI5Version": "1.130.0",
+      "libs": {
+        "sap.m": {},
+        "sap.ui.core": {},
+        "sap.fe.templates": {}
+      }
+    },
+    "models": {
+      "": {
+        "dataSource": "AdminService",
+        "settings": {
+          "synchronizationMode": "None",
+          "operationMode": "Server",
+          "autoExpandSelect": true
+        }
+      },
+      "i18n": {
+        "type": "sap.ui.model.resource.ResourceModel",
+        "settings": {
+          "bundleName": "ziloadminusers.i18n.i18n",
+          "supportedLocales": [
+            "en",
+            "pt",
+            "pt_BR"
+          ],
+          "fallbackLocale": "en"
+        }
+      }
+    },
+    "routing": {
+      "routes": [
+        {
+          "pattern": ":?query:",
+          "name": "UserProfileList",
+          "target": "UserProfileList"
+        },
+        {
+          "pattern": "UserProfile({key}):?query:",
+          "name": "UserProfileDetail",
+          "target": "UserProfileDetail"
+        },
+        {
+          "pattern": "JobRole:?query:",
+          "name": "JobRoleList",
+          "target": "JobRoleList"
+        },
+        {
+          "pattern": "JobRole({key}):?query:",
+          "name": "JobRoleDetail",
+          "target": "JobRoleDetail"
+        }
+      ],
+      "targets": {
+        "UserProfileList": {
+          "type": "Component",
+          "id": "UserProfileList",
+          "name": "sap.fe.templates.ListReport",
+          "options": {
+            "settings": {
+              "entitySet": "UserProfile",
+              "variantManagement": "None",
+              "initialLoad": true,
+              "navigation": {
+                "UserProfile": {
+                  "detail": {
+                    "route": "UserProfileDetail"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "UserProfileDetail": {
+          "type": "Component",
+          "id": "UserProfileDetail",
+          "name": "sap.fe.templates.ObjectPage",
+          "options": {
+            "settings": {
+              "entitySet": "UserProfile"
+            }
+          }
+        },
+        "JobRoleList": {
+          "type": "Component",
+          "id": "JobRoleList",
+          "name": "sap.fe.templates.ListReport",
+          "options": {
+            "settings": {
+              "entitySet": "JobRole",
+              "variantManagement": "None",
+              "initialLoad": true,
+              "navigation": {
+                "JobRole": {
+                  "detail": {
+                    "route": "JobRoleDetail"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "JobRoleDetail": {
+          "type": "Component",
+          "id": "JobRoleDetail",
+          "name": "sap.fe.templates.ObjectPage",
+          "options": {
+            "settings": {
+              "entitySet": "JobRole"
+            }
+          }
+        }
+      }
+    },
+    "contentDensities": {
+      "compact": true,
+      "cozy": true
+    }
+  },
+  "sap.fiori": {
+    "registrationIds": [],
+    "archeType": "analytical"
+  },
+  "sap.cloud": {
+    "public": true,
+    "service": "ziloadmin"
+  }
+}
