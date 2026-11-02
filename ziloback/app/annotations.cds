@@ -29,8 +29,15 @@ annotate AdminService.OrchestrationConfig with @(
       { Value: isActive,               Label: 'Ativo' }
     ]
   },
+  UI.FieldGroup #Modules: {
+    Label: 'Módulos AI Core (JSON)',
+    Data: [
+      { Value: moduleConfigJson, Label: 'Module Config JSON (do AI Launchpad → JSON editor)' }
+    ]
+  },
   UI.Facets: [
-    { $Type: 'UI.ReferenceFacet', Label: 'Geral', Target: '@UI.FieldGroup#General' }
+    { $Type: 'UI.ReferenceFacet', Label: 'Geral',           Target: '@UI.FieldGroup#General' },
+    { $Type: 'UI.ReferenceFacet', Label: 'Módulos AI Core', Target: '@UI.FieldGroup#Modules' }
   ]
 );
 
@@ -85,7 +92,7 @@ annotate AdminService.PolicyOrchestrations with @(
 // ── JobRole ───────────────────────────────────────────────────────────────────
 annotate AdminService.JobRole with @(
   UI.LineItem: [
-    { Value: name },
+    { Value: name,         Label: 'Cargo' },
     { Value: department,   Label: 'Departamento' },
     { Value: directorate,  Label: 'Diretoria' },
     { Value: policy.name,  Label: 'Política Padrão' },
@@ -100,7 +107,7 @@ annotate AdminService.JobRole with @(
   UI.FieldGroup #General: {
     Label: 'Geral',
     Data: [
-      { Value: name },
+      { Value: name,        Label: 'Nome do Cargo' },
       { Value: department,  Label: 'Departamento' },
       { Value: directorate, Label: 'Diretoria' },
       { Value: policy_id,   Label: 'Política Padrão' },
@@ -109,7 +116,10 @@ annotate AdminService.JobRole with @(
   },
   UI.Facets: [
     { $Type: 'UI.ReferenceFacet', Label: 'Geral', Target: '@UI.FieldGroup#General' }
-  ]
+  ],
+  Capabilities.InsertRestrictions: { Insertable: true },
+  Capabilities.UpdateRestrictions: { Updatable: true },
+  Capabilities.DeleteRestrictions: { Deletable: true }
 );
 
 // ── UserProfile ───────────────────────────────────────────────────────────────

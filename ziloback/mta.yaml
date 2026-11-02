@@ -107,6 +107,10 @@ modules:
           artifacts:
             - zilo-models.zip
           target-path: resources/
+        - name: zilo-admin-jobroles
+          artifacts:
+            - zilo-jobroles.zip
+          target-path: resources/
 
   # ── Admin UI apps ─────────────────────────────────────────────────────────────
   - name: zilo-admin-orchestrations
@@ -156,6 +160,17 @@ modules:
   - name: zilo-admin-models
     type: html5
     path: app/zilo-models
+    build-parameters:
+      build-result: dist
+      builder: custom
+      commands:
+        - npm install
+        - npm run build:cf
+      supported-platforms: []
+
+  - name: zilo-admin-jobroles
+    type: html5
+    path: app/zilo-jobroles
     build-parameters:
       build-result: dist
       builder: custom

@@ -1,66 +1,90 @@
 /**
- * SAP AI Core — Orchestration Service client.
+ * SAP AI Core — Orchestration Service client via @sap-ai-sdk/orchestration.
  *
- * Calls /v2/inference/deployments/{deploymentId}/completion.
- * Uses config_ref to reference an Orchestration Configuration by UUID — AI Core
- * resolves all modules (model, filters, grounding, masking) server-side.
- * No module JSON is stored or built in the CAP backend.
+ * Uses OrchestrationClient which supports:
+ *   - config_ref: { id }  → references a stored Orchestration Config by UUID (preferred)
+ *   - JSON string         → inline module_configurations from moduleConfigJson (fallback)
  *
- * Response: { request_id, final_result: { id, model, choices, usage } }
- * usage: { prompt_tokens, completion_tokens, total_tokens, prompt_tokens_details }
+ * The OrchestrationClient uses the correct path:
+ *   POST /inference/deployments/{id}/v2/completion
+ * which differs from the raw /v2/inference/deployments/{id}/completion path
+ * that the @sap-ai-sdk/core executeRequest used (causing 404s before).
  */
 
 import { createLogger } from '../utils/logger.js';
 
 const log = createLogger('aicore-orchestration');
 
-export async function createOrchestrationClient(deploymentId, resourceGroup = 'default') {
-  if (!deploymentId) throw new Error('deploymentId is required for orchestration client');
+const DEPLOYMENT_ID = 'd7a09bc4d6d523f7';
 
-  const { executeRequest, getAiCoreDestination } = await import('@sap-ai-sdk/core');
+export async function createOrchestrationClient(orch) {
+  const { OrchestrationClient } = await import('@sap-ai-sdk/orchestration');
+  const { getAiCoreDestination } = await import('@sap-ai-sdk/core');
+
   const destination = await getAiCoreDestination();
+  const deploymentConfig = { deploymentId: DEPLOYMENT_ID, resourceGroup: 'default' };
+
+  // Prefer config_ref, fall back to inline JSON
+  const config = orch.aicoreConfigId
+    ? { id: orch.aicoreConfigId }
+    : orch.moduleConfigJson;
+
+  if (!config) throw new Error(`OrchestrationConfig ${orch.id} has neither aicoreConfigId nor moduleConfigJson`);
+
+  const client = new OrchestrationClient(config, deploymentConfig, destination);
 
   return {
-    /**
-     * Send a chat completion through the orchestration pipeline.
-     *
-     * @param {object} opts
-     * @param {string} opts.aicoreConfigId   - Orchestration Config UUID from AI Launchpad
-     * @param {object[]} opts.messages       - Chat history [{role, content}]
-     * @param {object}  opts.inputParams     - Template placeholder values (e.g. { input })
-     * @param {boolean} opts.stream          - Enable SSE streaming
-     */
-    async complete({ aicoreConfigId, messages = [], inputParams = {}, stream = false }) {
-      if (!aicoreConfigId) throw new Error('aicoreConfigId is required');
+    async complete({ messages = [], stream = false }) {
+      const request = messages.length ? { messagesHistory: messages } : {};
+      const hasRef = typeof config === 'object' && 'id' in config;
+      // Force non-streaming for now — gpt-5.6-luna via orchestration deployment
+      // returns "Error while iterating over SSE stream" when streaming is enabled.
+      stream = false;
+      log.debug({ deploymentId: DEPLOYMENT_ID, hasConfigRef: hasRef, stream }, 'orchestration request');
 
-      const payload = {
-        config_ref: { id: aicoreConfigId },
-        messages_history: messages,
-        ...(Object.keys(inputParams).length ? { placeholder_values: inputParams } : {}),
+      const attemptComplete = async (c, useStream) => {
+        if (useStream) {
+          // client.stream() returns OrchestrationStreamResponse.
+          // The iterable chunks are in .stream property.
+          const streamResp = await c.stream(request);
+          return { streamResp };
+        }
+        const resp = await c.chatCompletion(request);
+        return { data: resp };
       };
 
-      const basePath = `/v2/inference/deployments/${deploymentId}`;
-      const targetPath = stream
-        ? `${basePath}/completion-with-response-stream`
-        : `${basePath}/completion`;
+      const isStreamErr = (err) => {
+        const detail = JSON.stringify(err?.response?.data ?? err?.cause?.response?.data ?? '');
+        return detail.includes('Streaming is not supported') || (err?.message ?? '').includes('Streaming');
+      };
 
-      log.debug({ deploymentId, aicoreConfigId, stream }, 'orchestration request');
+      // Helper: try with given config, auto-downgrade to non-streaming on stream errors
+      const tryComplete = async (c, useStream) => {
+        try {
+          return await attemptComplete(c, useStream);
+        } catch (err) {
+          if (useStream && isStreamErr(err)) {
+            log.info('model does not support streaming — retrying without');
+            return await attemptComplete(c, false);
+          }
+          throw err;
+        }
+      };
 
       try {
-        const httpResponse = await executeRequest(
-          { url: targetPath, resourceGroup },
-          payload,
-          { timeout: 0, ...(stream ? { responseType: 'stream' } : {}) },
-          destination
-        );
-        return { status: 200, data: httpResponse.data };
+        return await tryComplete(client, stream);
       } catch (err) {
-        const status = err.response?.status ?? err.cause?.response?.status ?? 500;
-        const data   = err.response?.data   ?? err.cause?.response?.data   ?? { error: { message: err.message } };
-        log.error({ status, deploymentId, aicoreConfigId, err: err.message }, 'orchestration request failed');
-        const apiErr = new Error(err.message);
-        apiErr.response = { status, data };
-        throw apiErr;
+        const body = err.response?.data ?? err.cause?.response?.data ?? null;
+        log.error({ status: err.response?.status ?? 500, hasConfigRef: hasRef, body, err: err.message }, 'orchestration failed');
+
+        // config_ref failed — retry with inline moduleConfigJson
+        if (hasRef && orch.moduleConfigJson) {
+          log.info('config_ref failed — retrying with inline moduleConfigJson');
+          const fallbackClient = new OrchestrationClient(orch.moduleConfigJson, deploymentConfig, destination);
+          return await tryComplete(fallbackClient, stream);
+        }
+
+        throw err;
       }
     },
   };

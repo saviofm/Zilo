@@ -12,15 +12,17 @@ export default class LedgerService extends cds.ApplicationService {
     const _uid = (req) => req.user?.id ?? req.user?.attr?.userUuid ?? 'anonymous';
 
     // ── TokenLedger: users only see their own rows ────────────────────────────
+    // userId is excluded from the LedgerService projection but exists on the
+    // base table — filter must use the db entity directly via interceptor.
 
     this.before('READ', 'TokenLedger', async req => {
       const uid = _uid(req);
-      req.query.where({ userId: uid });
+      req.query.where({ ref: ['userId'] }, '=', { val: uid });
     });
 
     this.before('READ', 'MonthlyUsageSummary', async req => {
       const uid = _uid(req);
-      req.query.where({ userId: uid });
+      req.query.where({ ref: ['userId'] }, '=', { val: uid });
     });
 
     // ── Function: myUsageByOrchestration ─────────────────────────────────────

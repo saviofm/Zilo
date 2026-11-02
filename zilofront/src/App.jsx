@@ -15,11 +15,13 @@ import {
 
 function UserMessage({ content }) {
   return (
-    <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 24 }}>
+    <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 20 }}>
       <div style={{
-        background: 'var(--bubble-user)', color: 'var(--text-primary)',
+        background: 'var(--bubble-user)',
+        border: '1px solid #c8e8b0',
+        color: 'var(--text-primary)',
         padding: '12px 16px', borderRadius: '16px 16px 4px 16px',
-        fontSize: 14, lineHeight: 1.6, maxWidth: '60%', wordBreak: 'break-word',
+        fontSize: 14, lineHeight: 1.6, maxWidth: '65%', wordBreak: 'break-word',
       }}>
         {content}
       </div>
@@ -29,8 +31,16 @@ function UserMessage({ content }) {
 
 function AssistantMessage({ content, streaming }) {
   return (
-    <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: 24 }}>
-      <div style={{ fontSize: 14, lineHeight: 1.7, maxWidth: '88%', wordBreak: 'break-word', color: 'var(--text-primary)' }}>
+    <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: 20, gap: 10 }}>
+      {/* Zilo avatar */}
+      <div style={{
+        width: 30, height: 30, borderRadius: '50%', flexShrink: 0, marginTop: 2,
+        background: 'var(--joule)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+      }}>
+        <img src="/LOGO_ZILO.png" alt="Zilo" style={{ width: 18, height: 18, objectFit: 'contain', filter: 'brightness(0) invert(1)' }} />
+      </div>
+      <div style={{ fontSize: 14, lineHeight: 1.7, maxWidth: '80%', wordBreak: 'break-word', color: 'var(--text-primary)' }}>
         <Markdown text={content} />
         {streaming && <span className="streaming-cursor" />}
       </div>
@@ -78,6 +88,9 @@ export default function App() {
   const activeConv = conversations.find(c => c.id === activeConvId) ?? null
   const messages = activeConv?.messages ?? []
 
+  // The orchestration for a given send: use active conv's orchId or fallback to selector
+  const activeOrchId = activeConv?.orchestrationId ?? selectedOrchId
+
   function patchConv(id, patch) {
     setConversations(prev => prev.map(c => c.id === id ? { ...c, ...patch } : c))
   }
@@ -86,20 +99,23 @@ export default function App() {
     if (!text.trim() || isStreaming) return
 
     let convId = activeConvId
-    let convOrchId = activeConv?.orchestrationId ?? selectedOrchId
+    const orchId = selectedOrchId  // always use the selector's current choice
 
     if (!convId) {
       const title = text.slice(0, 60) || 'Nova conversa'
       try {
-        const created = await createConversation(title, convOrchId)
+        const created = await createConversation(title, orchId)
         convId = created.id
-        setConversations(prev => [makeConv(convId, title, convOrchId), ...prev])
+        setConversations(prev => [makeConv(convId, title, orchId), ...prev])
         setActiveConvId(convId)
       } catch {
         convId = `local-${Date.now()}`
-        setConversations(prev => [makeConv(convId, text.slice(0, 40), convOrchId), ...prev])
+        setConversations(prev => [makeConv(convId, text.slice(0, 40), orchId), ...prev])
         setActiveConvId(convId)
       }
+    } else if (orchId && orchId !== activeConv?.orchestrationId) {
+      // User switched persona mid-conversation — update locally
+      patchConv(convId, { orchestrationId: orchId })
     }
 
     const userMsg = { role: 'user', content: text }
@@ -116,6 +132,7 @@ export default function App() {
       await sendChat({
         conversationId: convId,
         message: text,
+        orchestrationId: orchId,  // send current persona selection per message
         onDelta: (chunk) => {
           fullText += chunk
           setStreamingText(fullText)
@@ -143,7 +160,6 @@ export default function App() {
     } finally {
       setIsStreaming(false)
       setStreamingText('')
-      // Refresh budget after each message
       fetchBudgetStatus().then(setBudgetStatus).catch(() => {})
     }
   }
@@ -151,6 +167,8 @@ export default function App() {
   async function handleSelectConversation(id) {
     setActiveConvId(id)
     const conv = conversations.find(c => c.id === id)
+    // Sync selector to the conversation's persona
+    if (conv?.orchestrationId) setSelectedOrchId(conv.orchestrationId)
     if (!conv || conv.loaded) return
     try {
       const data = await loadConversation(id)
@@ -167,14 +185,8 @@ export default function App() {
 
   return (
     <div style={{ display: 'flex', height: '100vh', width: '100vw', overflow: 'hidden', background: 'var(--bg-page)' }}>
-      <Sidebar
-        activeItem={activeNav}
-        user={currentUser}
-        budgetStatus={budgetStatus}
-        onSelect={setActiveNav}
-      />
+      <Sidebar activeItem={activeNav} user={currentUser} budgetStatus={budgetStatus} onSelect={setActiveNav} />
 
-      {/* Conversation list panel */}
       {activeNav === 'chat' && showConvList && (
         <ConversationList
           conversations={conversations}
@@ -193,26 +205,26 @@ export default function App() {
         />
       )}
 
-      {/* Chat view */}
       {activeNav === 'chat' && (
-        <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, background: '#fff' }}>
           <Header
             title={activeConv?.title || 'Zilo'}
             onMenuClick={() => setShowConvList(s => !s)}
           />
 
-          <div style={{ flex: 1, overflowY: 'auto', padding: '32px 48px 16px' }}>
+          {/* Messages */}
+          <div style={{ flex: 1, overflowY: 'auto', padding: '32px 56px 16px' }}>
             {messages.length === 0 && !isStreaming && (
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: 16 }}>
-                <div style={{ width: 64, height: 64, borderRadius: 16, background: 'var(--joule)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <svg viewBox="0 0 24 24" width="32" height="32" fill="white">
-                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/>
-                  </svg>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: 20 }}>
+                <img src="/LOGO_ZILO.png" alt="Zilo" style={{ width: 100, objectFit: 'contain' }} />
+                <div style={{ textAlign: 'center' }}>
+                  <p style={{ fontSize: 22, fontWeight: 700, color: 'var(--joule)', marginBottom: 8 }}>
+                    Como posso ajudar?
+                  </p>
+                  <p style={{ fontSize: 13, color: 'var(--text-muted)', maxWidth: 380 }}>
+                    Assistente de IA da Zilor. Faça perguntas sobre documentos, políticas e dados da empresa.
+                  </p>
                 </div>
-                <p style={{ fontSize: 20, fontWeight: 600, color: 'var(--text-primary)' }}>Como posso ajudar?</p>
-                <p style={{ fontSize: 13, color: 'var(--text-muted)', textAlign: 'center', maxWidth: 400 }}>
-                  Assistente de IA da Zilor. Faça perguntas sobre documentos, políticas e dados da empresa.
-                </p>
               </div>
             )}
 
@@ -229,25 +241,24 @@ export default function App() {
             <div ref={bottomRef} />
           </div>
 
-          <div style={{ padding: '12px 48px 4px', borderTop: '1px solid var(--border)', background: 'var(--bg-page)' }}>
+          {/* Input */}
+          <div style={{ padding: '12px 56px 4px', borderTop: '1px solid var(--border)', background: '#fff' }}>
             <MessageInput
               onSend={handleSend}
               loading={isStreaming}
               orchestrations={orchestrations}
               selectedOrchId={selectedOrchId}
+              conversationOrchId={activeConv?.orchestrationId}
               onOrchChange={setSelectedOrchId}
             />
           </div>
-          <div style={{ textAlign: 'center', padding: '4px 0 8px', fontSize: 11, color: 'var(--text-disabled)' }}>
+          <div style={{ textAlign: 'center', padding: '4px 0 10px', fontSize: 11, color: 'var(--text-disabled)' }}>
             O Zilo pode cometer erros. Verifique informações importantes.
           </div>
         </div>
       )}
 
-      {/* Consumption view */}
-      {activeNav === 'consumption' && (
-        <ConsumptionRoute />
-      )}
+      {activeNav === 'consumption' && <ConsumptionRoute />}
     </div>
   )
 }

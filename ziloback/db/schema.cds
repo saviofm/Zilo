@@ -22,10 +22,11 @@ entity ModelCatalog {
 //                  resolves modules (model, filters, grounding, masking) server-side.
 entity OrchestrationConfig {
   key id                     : UUID;
-      name                   : String(200);   // "Zilo Padrão", "Zilo Analítico"
+      name                   : String(200);
       description            : String(1000);
       deploymentId           : String(100);   // AI Core ML Ops deployment ID (shared)
-      aicoreConfigId         : String(100);   // Gen AI Hub Orchestration Config UUID
+      aicoreConfigId         : String(100);   // Gen AI Hub Orchestration Config UUID (reference only)
+      moduleConfigJson       : LargeString;   // JSON of modules block exported from AI Launchpad
       model                  : Association to ModelCatalog; // for cost calculation only
       orchestrationCUPerCall : Decimal(10,6) default 0.0001;
       isActive               : Boolean default true;
@@ -38,7 +39,7 @@ entity OrchestrationConfig {
 entity CostPolicy {
   key id                   : UUID;
       name                 : String(200);  // "Política Estagiário", "Política Especialista"
-      monthlyBudgetCU      : Decimal(10,4); // max capacity units per month
+      monthlyBudgetCU      : Integer; // max capacity units per month
       validFrom            : Date;
       validTo              : Date;         // null = sem expiração
       isActive             : Boolean default true;
@@ -129,7 +130,7 @@ entity TokenLedger {
       totalCU        : Decimal(14,8);         // llmCU + orchCU
       timestamp      : Timestamp;
       // Monthly budget enforcement snapshot at call time
-      budgetCU       : Decimal(10,4);         // policy budget at time of call
+      budgetCU       : Integer;               // policy budget at time of call
       usedCUMonth    : Decimal(14,8);         // cumulative CU used in same calendar month before this call
 }
 
@@ -140,7 +141,7 @@ entity MonthlyUsageSummary {
       yearMonth     : String(7);   // "2026-10"
       totalCU       : Decimal(14,8);
       totalCalls    : Integer;
-      budgetCU      : Decimal(10,4);
+      budgetCU      : Integer;
       percentUsed   : Decimal(5,2);
       computedAt    : Timestamp;
 }

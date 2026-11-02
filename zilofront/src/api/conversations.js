@@ -16,8 +16,8 @@ export async function listConversations() {
   return Array.isArray(data?.value) ? data.value : Array.isArray(data) ? data : []
 }
 
-export async function createConversation(title, assistant) {
-  return odata('POST', '/Conversations', { title, assistant: assistant ?? null })
+export async function createConversation(title, orchestrationId) {
+  return odata('POST', '/Conversations', { title, orchestration_id: orchestrationId ?? null })
 }
 
 export async function loadConversation(id) {

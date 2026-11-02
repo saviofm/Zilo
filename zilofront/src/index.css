@@ -2,12 +2,14 @@
 
 /* ── Zilor Design Tokens ── */
 :root {
-  /* Brand / Zilor green */
+  /* Brand */
   --joule:              #01502D;
   --joule-hover:        #005a33;
   --joule-pressed:      #003d22;
-  --joule-bg:           #e8f5e9;   /* active item bg, tooltip bg */
-  --joule-bg-light:     #c8e6c9;   /* hover on active */
+  --accent:             #8CC63E;   /* lime green — CTAs, hover states */
+  --accent-hover:       #7ab332;
+  --accent-light:       #f0f8e8;   /* very light tint for backgrounds */
+  --danger:             #F05A22;
 
   /* Text */
   --text-primary:       #2D2D2D;
@@ -17,28 +19,37 @@
   --text-link:          #01502D;
 
   /* Backgrounds */
-  --bg-page:            #FFFFFF;   /* main content white */
-  --bg-shell:           #F0F0F0;   /* sidebar / shell */
+  --bg-page:            #FFFFFF;
+  --bg-shell:           #F7F8FA;   /* conversation list — off-white */
   --bg-secondary:       #f0f2f4;
   --bg-hover:           #f0f2f4;
+
+  /* Sidebar — verde escuro Zilor */
+  --sidebar-bg:         #01502D;
+  --sidebar-text:       rgba(255,255,255,0.85);
+  --sidebar-text-active:#FFFFFF;
+  --sidebar-active-bg:  rgba(140,198,62,0.25);   /* accent com transparência */
+  --sidebar-hover-bg:   rgba(255,255,255,0.08);
+  --sidebar-border:     rgba(255,255,255,0.12);
 
   /* Borders */
   --border:             #e6e7ea;
   --border-active:      #7c879c;
-  --border-focus:       #01502D;
+  --border-focus:       #8CC63E;
 
-  /* User message bubble — light green tint */
-  --bubble-user:        #e8f5e9;
+  /* Chat bubbles */
+  --bubble-user:        #E8F5E3;   /* tint verde limão */
 
   /* Avatar */
-  --avatar-bg:          #c8e6c9;
-  --avatar-text:        #01502D;
+  --avatar-bg:          rgba(255,255,255,0.18);
+  --avatar-text:        #FFFFFF;
 
-  /* Progress bar gradient */
+  /* Progress */
   --progress-grad: linear-gradient(to right, #8CC63E, #01502D);
 
   /* Shadows */
-  --shadow-card: 0 1px 3px rgba(0,0,0,0.07), 0 1px 2px rgba(0,0,0,0.04);
+  --shadow-card:   0 1px 3px rgba(0,0,0,0.07), 0 1px 2px rgba(0,0,0,0.04);
+  --shadow-popover: 0 8px 24px rgba(0,0,0,0.12);
 }
 
 /* ── Reset ── */
@@ -70,25 +81,11 @@ button { font-family: inherit; cursor: pointer; }
 ::-webkit-scrollbar-thumb:hover { background: #9ca3af; }
 
 /* ── Animations ── */
-@keyframes progressFill {
-  from { width: 4%; }
-  to   { width: 100%; }
-}
-@keyframes fadeInUp {
-  from { opacity: 0; transform: translateY(6px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to   { opacity: 1; }
-}
-@keyframes tooltipSlide {
-  from { opacity: 0; transform: translateX(-8px); }
-  to   { opacity: 1; transform: translateX(0); }
-}
+@keyframes progressFill  { from { width: 4%; } to { width: 100%; } }
+@keyframes fadeInUp      { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes spin          { to { transform: rotate(360deg); } }
+@keyframes fadeIn        { from { opacity: 0; } to { opacity: 1; } }
+@keyframes tooltipSlide  { from { opacity: 0; transform: translateX(-8px); } to { opacity: 1; transform: translateX(0); } }
 
 .animate-progress    { animation: progressFill 2.8s ease-out forwards; }
 .animate-fade-in-up  { animation: fadeInUp 0.3s ease forwards; opacity: 0; }
@@ -96,39 +93,21 @@ button { font-family: inherit; cursor: pointer; }
 .animate-fade-in     { animation: fadeIn 0.18s ease forwards; }
 .animate-tooltip     { animation: tooltipSlide 0.16s ease forwards; }
 
-/* Streaming dots */
-@keyframes streamingBounce {
-  0%, 80%, 100% { transform: translateY(0); opacity: 0.4; }
-  40%            { transform: translateY(-4px); opacity: 1; }
-}
-.streaming-dot {
-  display: inline-block;
-  width: 5px; height: 5px;
-  border-radius: 50%;
-  background: var(--joule);
-  animation: streamingBounce 1.2s ease-in-out infinite;
-}
-
-/* Blinking cursor at end of streaming text */
+/* Streaming cursor */
 @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
 .streaming-cursor::after {
   content: '▋';
   display: inline-block;
-  color: var(--joule);
+  color: var(--accent);
   animation: blink 0.8s step-end infinite;
   margin-left: 1px;
   font-size: 0.85em;
-  vertical-align: baseline;
 }
 
 /* ── Sidebar ── */
-.sidebar-transition  { transition: width 0.4s cubic-bezier(0.32, 0.72, 0, 1); }
+.sidebar-transition { transition: width 0.4s cubic-bezier(0.32, 0.72, 0, 1); }
 
-/* Nav item hover */
-.nav-item { transition: background 0.12s ease; }
-.nav-item:hover { background: var(--bg-hover) !important; }
-
-/* ── Utility: surface card ── */
+/* ── Utility ── */
 .card {
   background: var(--bg-page);
   border: 1px solid var(--border);
@@ -136,5 +115,40 @@ button { font-family: inherit; cursor: pointer; }
   box-shadow: var(--shadow-card);
 }
 
-/* ── Input focus ring override ── */
 textarea:focus, input:focus { outline: none; }
+
+/* ── Buttons ── */
+.btn-accent {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 8px;
+  border: none;
+  background: var(--accent);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+  font-family: inherit;
+}
+.btn-accent:hover { background: var(--accent-hover); }
+.btn-accent:disabled { background: var(--text-disabled); cursor: default; }
+
+.btn-outline-accent {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 8px;
+  border: 1.5px solid var(--accent);
+  background: transparent;
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.12s;
+  font-family: inherit;
+}
+.btn-outline-accent:hover { background: var(--accent-light); }

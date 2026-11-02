@@ -1,9 +1,9 @@
 // POST /api/chat — streaming SSE
-export async function sendChat({ conversationId, message, onDelta, onDone }) {
+export async function sendChat({ conversationId, message, orchestrationId, onDelta, onDone }) {
   const res = await fetch('/api/chat', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ conversationId, message, stream: true }),
+    body: JSON.stringify({ conversationId, message, orchestrationId, stream: true }),
   })
 
   if (!res.ok) {
