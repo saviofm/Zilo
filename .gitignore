@@ -10,14 +10,18 @@ private-key.pem
 *.pem
 *.key
 .DS_Store
+CLAUDE.md
 *.mtar
 mta_archives/
 mta-op-*/
 graphify-out/
 *.pdf
-*.png
 *.jpg
 ziloback/.gitignore
+# Exclude root-level images (screenshots, etc) but allow public assets
+/img_site.png
+/zilor-home.png
+/LOGO_ZILO.png
 zilofront/.gitignore
 ziloback/package-lock.json
 zilofront/package-lock.json

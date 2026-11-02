@@ -35,10 +35,10 @@ function AssistantMessage({ content, streaming }) {
       {/* Zilo avatar */}
       <div style={{
         width: 30, height: 30, borderRadius: '50%', flexShrink: 0, marginTop: 2,
-        background: 'var(--joule)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        background: '#fff', border: '1.5px solid var(--border)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 2,
       }}>
-        <img src="/LOGO_ZILO.png" alt="Zilo" style={{ width: 18, height: 18, objectFit: 'contain', filter: 'brightness(0) invert(1)' }} />
+        <img src="/logo_simples.png" alt="Zilo" style={{ width: 22, height: 22, objectFit: 'contain' }} />
       </div>
       <div style={{ fontSize: 14, lineHeight: 1.7, maxWidth: '80%', wordBreak: 'break-word', color: 'var(--text-primary)' }}>
         <Markdown text={content} />
@@ -216,7 +216,7 @@ export default function App() {
           <div style={{ flex: 1, overflowY: 'auto', padding: '32px 56px 16px' }}>
             {messages.length === 0 && !isStreaming && (
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: 20 }}>
-                <img src="/LOGO_ZILO.png" alt="Zilo" style={{ width: 100, objectFit: 'contain' }} />
+                <img src="/LOGO_COMPLETO.png" alt="Zilo" style={{ height: 110, objectFit: 'contain' }} />
                 <div style={{ textAlign: 'center' }}>
                   <p style={{ fontSize: 22, fontWeight: 700, color: 'var(--joule)', marginBottom: 8 }}>
                     Como posso ajudar?

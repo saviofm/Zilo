@@ -138,17 +138,30 @@ export default function Sidebar({ activeItem, onSelect, user, budgetStatus }) {
       {/* Logo */}
       <div style={{
         height: 64, display: 'flex', alignItems: 'center',
-        padding: collapsed ? '0' : '0 16px',
+        padding: collapsed ? '0' : '0 14px',
         justifyContent: collapsed ? 'center' : 'flex-start',
         borderBottom: '1px solid var(--sidebar-border)',
         flexShrink: 0,
       }}>
         {collapsed ? (
-          <img src="/LOGO_ZILO.png" alt="Zilo"
-            style={{ width: 36, height: 36, objectFit: 'contain', filter: 'brightness(0) invert(1)' }} />
+          <div style={{
+            width: 40, height: 40, borderRadius: 10,
+            background: 'rgba(255,255,255,0.95)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            padding: 3, flexShrink: 0,
+          }}>
+            <img src="/logo_simples.png" alt="Zilo"
+              style={{ width: 32, height: 32, objectFit: 'contain' }} />
+          </div>
         ) : (
-          <img src="/LOGO_ZILO.png" alt="Zilo"
-            style={{ height: 40, objectFit: 'contain', filter: 'brightness(0) invert(1)' }} />
+          <div style={{
+            background: 'rgba(255,255,255,0.95)',
+            borderRadius: 10, padding: '6px 10px',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            <img src="/LOGO_COMPLETO.png" alt="Zilo"
+              style={{ height: 42, objectFit: 'contain' }} />
+          </div>
         )}
       </div>
 
