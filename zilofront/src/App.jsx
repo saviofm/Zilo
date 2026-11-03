@@ -5,6 +5,7 @@ import MessageInput from './components/MessageInput'
 import ConversationList from './components/ConversationList'
 import Markdown from './components/Markdown'
 import ConsumptionRoute from './routes/ConsumptionRoute'
+import SessionExpiredScreen from './components/SessionExpiredScreen'
 import { sendChat } from './api/chat'
 import { fetchUser } from './api/user'
 import { fetchMyOrchestrations, fetchBudgetStatus } from './api/orchestrations'
@@ -86,7 +87,16 @@ export default function App() {
   const [orchestrations, setOrchestrations] = useState([])
   const [selectedOrchId, setSelectedOrchId] = useState(null)
   const [budgetStatus, setBudgetStatus] = useState(null)
+  const [sessionExpired, setSessionExpired] = useState(false)
   const bottomRef = useRef(null)
+  const scrollContainerRef = useRef(null)
+  const lastAssistantRef = useRef(null)
+
+  useEffect(() => {
+    const handler = () => setSessionExpired(true)
+    window.addEventListener('session-expired', handler)
+    return () => window.removeEventListener('session-expired', handler)
+  }, [])
 
   useEffect(() => { fetchUser().then(setCurrentUser) }, [])
 
@@ -104,12 +114,31 @@ export default function App() {
     }).catch(() => {})
   }, [])
 
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [streamingText, conversations])
-
   const activeConv = conversations.find(c => c.id === activeConvId) ?? null
   const messages = activeConv?.messages ?? []
+
+  // True when user is near the bottom (within 150px)
+  function isNearBottom() {
+    const el = scrollContainerRef.current
+    if (!el) return true
+    return el.scrollHeight - el.scrollTop - el.clientHeight < 150
+  }
+
+  // During streaming: follow bottom only if user was already near it
+  useEffect(() => {
+    if (isStreaming && isNearBottom()) {
+      bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+    }
+  }, [streamingText]) // eslint-disable-line
+
+  // When response completes: scroll to start of last assistant message
+  useEffect(() => {
+    if (!isStreaming && messages.length > 0) {
+      setTimeout(() => {
+        lastAssistantRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      }, 80)
+    }
+  }, [messages.length]) // eslint-disable-line
 
   // The orchestration for a given send: use active conv's orchId or fallback to selector
   const activeOrchId = activeConv?.orchestrationId ?? selectedOrchId
@@ -231,7 +260,7 @@ export default function App() {
           />
 
           {/* Messages */}
-          <div style={{ flex: 1, overflowY: 'auto', padding: '32px 56px 16px' }}>
+          <div ref={scrollContainerRef} style={{ flex: 1, overflowY: 'auto', padding: '32px 56px 16px' }}>
             {messages.length === 0 && !isStreaming && (
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: 20 }}>
                 <img src="/LOGO_COMPLETO.png" alt="Zilo" style={{ height: 110, objectFit: 'contain' }} />
@@ -246,11 +275,14 @@ export default function App() {
               </div>
             )}
 
-            {messages.map((msg, i) =>
-              msg.role === 'user'
+            {messages.map((msg, i) => {
+              const isLastAssistant = msg.role === 'assistant' && i === messages.length - 1
+              return msg.role === 'user'
                 ? <UserMessage key={i} content={msg.content} />
-                : <AssistantMessage key={i} content={msg.content} streaming={false} />
-            )}
+                : <div key={i} ref={isLastAssistant ? lastAssistantRef : null}>
+                    <AssistantMessage content={msg.content} streaming={false} />
+                  </div>
+            })}
 
             {isStreaming && !streamingText && <ThinkingMessage />}
             {isStreaming && streamingText && (
@@ -278,6 +310,8 @@ export default function App() {
       )}
 
       {activeNav === 'consumption' && <ConsumptionRoute />}
+
+      {sessionExpired && <SessionExpiredScreen />}
     </div>
   )
 }

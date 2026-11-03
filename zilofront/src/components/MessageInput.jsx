@@ -2,14 +2,33 @@ import { useRef, useState } from 'react'
 
 function OrchSelector({ orchestrations, selectedOrchId, conversationOrchId, onOrchChange }) {
   const [open, setOpen] = useState(false)
+  const [dropdownPos, setDropdownPos] = useState(null)
+  const btnRef = useRef(null)
   const selected = orchestrations.find(o => o.id === selectedOrchId)
+
+  function handleOpen() {
+    if (!open && btnRef.current) {
+      const rect = btnRef.current.getBoundingClientRect()
+      const spaceAbove = rect.top
+      const spaceBelow = window.innerHeight - rect.bottom
+      setDropdownPos({
+        left: rect.left,
+        ...(spaceAbove > spaceBelow
+          ? { bottom: window.innerHeight - rect.top + 6 }
+          : { top: rect.bottom + 6 }
+        )
+      })
+    }
+    setOpen(o => !o)
+  }
 
   if (!orchestrations || orchestrations.length <= 1) return null
 
   return (
     <div style={{ position: 'relative', flexShrink: 0 }}>
       <button
-        onClick={() => setOpen(o => !o)}
+        ref={btnRef}
+        onClick={handleOpen}
         style={{
           display: 'inline-flex', alignItems: 'center', gap: 5,
           padding: '4px 10px', border: '1.5px solid var(--accent)',
@@ -36,12 +55,15 @@ function OrchSelector({ orchestrations, selectedOrchId, conversationOrchId, onOr
         <>
           <div onClick={() => setOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 100 }} />
           <div style={{
-            position: 'absolute', bottom: '100%', left: 0, marginBottom: 6,
+            position: 'fixed',
+            ...dropdownPos,
+            zIndex: 200,
             background: '#fff', border: '1px solid var(--border)',
             borderRadius: 10, boxShadow: 'var(--shadow-popover)',
-            minWidth: 200, zIndex: 200, overflow: 'hidden',
+            minWidth: 220, maxWidth: 320,
+            maxHeight: '60vh', overflowY: 'auto',
           }}>
-            <div style={{ padding: '8px 12px 4px', fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
+            <div style={{ padding: '8px 12px 4px', fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em', position: 'sticky', top: 0, background: '#fff', borderBottom: '1px solid var(--border)', zIndex: 1 }}>
               Persona de IA
             </div>
             {orchestrations.map(orch => (

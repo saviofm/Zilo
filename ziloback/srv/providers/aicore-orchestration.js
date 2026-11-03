@@ -35,13 +35,23 @@ export async function createOrchestrationClient(orch) {
 
   return {
     async complete({ messages = [], stream = false }) {
-      const lastUserMsg = [...messages].reverse().find(m => m.role === 'user')?.content ?? '';
-      const request = {
-        ...(messages.length ? { messagesHistory: messages } : {}),
-        // Only pass grounding placeholder when grounding is enabled for this persona.
-        // Sending unused placeholders causes a 400 from the orchestration service.
-        ...(orch.groundingEnabled && { placeholderValues: { grounding_input_variable_1: lastUserMsg } }),
-      };
+      let request;
+
+      if (orch.groundingEnabled) {
+        // Grounding personas: template has {{?grounding_input_variable_1}} as user message.
+        // Current user message goes as placeholderValues; prior history goes in messagesHistory.
+        // The grounding service uses the input placeholder for vector search and injects
+        // retrieved docs into {{?grounding_output_variable}} before calling the LLM.
+        const currentUserMsg = [...messages].reverse().find(m => m.role === 'user')?.content ?? '';
+        const history = messages.slice(0, -1); // all except last user message
+        request = {
+          placeholderValues: { grounding_input_variable_1: currentUserMsg },
+          ...(history.length && { messagesHistory: history }),
+        };
+      } else {
+        // Non-grounding personas: all messages go as history (template has no placeholders).
+        request = messages.length ? { messagesHistory: messages } : {};
+      }
       const hasRef = typeof config === 'object' && 'id' in config;
       log.debug({ deploymentId: DEPLOYMENT_ID, hasConfigRef: hasRef, stream }, 'orchestration request');
 
