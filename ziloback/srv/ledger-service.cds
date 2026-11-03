@@ -2,10 +2,10 @@ using { zilo } from '../db/schema';
 
 // ── LedgerService — /api/ledger ───────────────────────────────────────────────
 // Read-only surface for regular users to see their own consumption.
-// userId enforced server-side — users only see their own rows.
+// userId kept in projection so HANA view includes it for WHERE filtering.
+// The before-READ handler ensures each user only sees their own rows.
 service LedgerService @(path: '/api/ledger') {
 
-  // Exposed so OData navigation from TokenLedger works within this service
   @readonly entity OrchestrationConfig as projection on zilo.OrchestrationConfig
     { id, name, description, model, isActive };
 
@@ -14,13 +14,11 @@ service LedgerService @(path: '/api/ledger') {
 
   @readonly
   entity TokenLedger as projection on zilo.TokenLedger
-    excluding { userId, budgetCU, usedCUMonth };
+    excluding { budgetCU, usedCUMonth };
 
   @readonly
-  entity MonthlyUsageSummary as projection on zilo.MonthlyUsageSummary
-    excluding { userId };
+  entity MonthlyUsageSummary as projection on zilo.MonthlyUsageSummary;
 
-  // Aggregated consumption by orchestration for the current user
   function myUsageByOrchestration(yearMonth : String(7)) returns array of {
     orchestrationName : String;
     totalCU           : Decimal;

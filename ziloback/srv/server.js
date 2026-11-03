@@ -104,6 +104,7 @@ cds.on('served', () => {
       // The provider may downgrade to non-streaming if the model doesn't support it.
       // We detect this by checking whether the result has { stream } or { data }.
       const result = await client.complete({ messages, stream });
+      log.info({ hasStreamResp: !!result.streamResp, hasData: !!result.data }, 'chat result type');
 
       if (stream) {
         res.setHeader('Content-Type', 'text/event-stream');
@@ -126,7 +127,8 @@ cds.on('served', () => {
               res.write(`data: ${JSON.stringify({ type: 'delta', text: delta })}\n\n`);
             }
           }
-          usageData = result.streamResp.getUsage?.() ?? null;
+          usageData = result.streamResp.getTokenUsage?.() ?? result.streamResp.getUsage?.() ?? null;
+          log.info({ usageData }, 'chat streaming usage');
         } finally {
           clearInterval(heartbeat);
         }
@@ -135,6 +137,7 @@ cds.on('served', () => {
         const resp = result.data;
         fullText = resp.getContent?.() ?? resp.choices?.[0]?.message?.content ?? '';
         usageData = resp.getUsage?.() ?? resp.usage ?? null;
+        log.info({ usageData, fullTextLen: fullText?.length }, 'chat usage');
 
         if (stream) {
           // Client expected SSE — send the full text as a single delta
