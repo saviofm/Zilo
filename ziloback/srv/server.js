@@ -160,7 +160,21 @@ cds.on('served', () => {
         }
       }
 
-      // ── 8. Persist + close ────────────────────────────────────────────────────
+      // ── 8. Detect downloadable blocks + emit attachment events ───────────────
+      if (stream && fullText) {
+        const blockRe = /```(csv|json|xlsx|tsv)(:[^\n]*)?\n([\s\S]*?)```/gi;
+        let m;
+        while ((m = blockRe.exec(fullText)) !== null) {
+          const format   = m[1].toLowerCase();
+          const filename = m[2] ? m[2].slice(1).trim() : `dados.${format === 'xlsx' ? 'xlsx' : format}`;
+          const data     = m[3].trim();
+          if (data) {
+            res.write(`data: ${JSON.stringify({ type: 'attachment', format, filename, data })}\n\n`);
+          }
+        }
+      }
+
+      // ── 9. Persist + close ────────────────────────────────────────────────────
       const assistantMsgId = cds.utils.uuid();
       const ledgerId = cds.utils.uuid();
       await INSERT.into(Messages).entries({

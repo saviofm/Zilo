@@ -6,6 +6,7 @@ import ConversationList from './components/ConversationList'
 import Markdown from './components/Markdown'
 import ConsumptionRoute from './routes/ConsumptionRoute'
 import SessionExpiredScreen from './components/SessionExpiredScreen'
+import { downloadAsExcel, downloadAsCSV, downloadAsJSON } from './api/files.js'
 import { sendChat } from './api/chat'
 import { fetchUser } from './api/user'
 import { fetchMyOrchestrations, fetchBudgetStatus } from './api/orchestrations'
@@ -14,17 +15,68 @@ import {
   renameConversation, deleteConversation,
 } from './api/conversations'
 
-function UserMessage({ content }) {
+function AttachmentChip({ attachment }) {
+  const isImg = attachment.type === 'image'
+  return (
+    <div style={{
+      display: 'inline-flex', alignItems: 'center', gap: 5,
+      background: isImg ? '#e8f5e3' : '#f3f4f6',
+      border: `1px solid ${isImg ? 'var(--accent)' : 'var(--border)'}`,
+      borderRadius: 7, padding: '3px 8px', fontSize: 11, fontWeight: 500,
+      color: 'var(--text-primary)', maxWidth: 180,
+    }}>
+      {isImg
+        ? <svg viewBox="0 0 14 14" width="10" height="10" fill="none"><rect x="1" y="1" width="12" height="12" rx="2" stroke="var(--accent)" strokeWidth="1.3"/><circle cx="4.5" cy="4.5" r="1.2" fill="var(--accent)"/><path d="M1 10l3.5-3.5 2.5 2.5 1.5-1.5L13 12" stroke="var(--accent)" strokeWidth="1.1" strokeLinecap="round" strokeLinejoin="round"/></svg>
+        : <svg viewBox="0 0 14 14" width="10" height="10" fill="none"><path d="M2 1h7l3 3v9H2V1z" stroke="var(--text-muted)" strokeWidth="1.2" strokeLinejoin="round"/><path d="M9 1v3h3" stroke="var(--text-muted)" strokeWidth="1.2" strokeLinejoin="round"/></svg>
+      }
+      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{attachment.name}</span>
+    </div>
+  )
+}
+
+function DownloadChip({ att }) {
+  function handleDownload() {
+    if (att.format === 'json') downloadAsJSON(att.data, att.filename)
+    else if (att.format === 'csv' || att.format === 'tsv') downloadAsExcel(att.data, att.filename.replace(/\.(csv|tsv)$/, '.xlsx'))
+    else downloadAsExcel(att.data, att.filename)
+  }
+  const icons = { csv: '📊', json: '📋', xlsx: '📊', tsv: '📊' }
+  return (
+    <button onClick={handleDownload} style={{
+      display: 'inline-flex', alignItems: 'center', gap: 6,
+      background: 'var(--accent-light)', border: '1px solid var(--accent)',
+      borderRadius: 8, padding: '5px 12px', cursor: 'pointer',
+      fontSize: 12, fontWeight: 600, color: 'var(--joule)',
+      fontFamily: 'inherit', transition: 'background 0.12s',
+    }}
+      onMouseEnter={e => e.currentTarget.style.background = '#d4edb8'}
+      onMouseLeave={e => e.currentTarget.style.background = 'var(--accent-light)'}
+    >
+      <span>{icons[att.format] ?? '📄'}</span>
+      Baixar {att.filename}
+    </button>
+  )
+}
+
+function UserMessage({ content, attachments = [] }) {
   return (
     <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 20 }}>
-      <div style={{
-        background: 'var(--bubble-user)',
-        border: '1px solid #c8e8b0',
-        color: 'var(--text-primary)',
-        padding: '12px 16px', borderRadius: '16px 16px 4px 16px',
-        fontSize: 14, lineHeight: 1.6, maxWidth: '65%', wordBreak: 'break-word',
-      }}>
-        {content}
+      <div style={{ maxWidth: '65%' }}>
+        {attachments.length > 0 && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, justifyContent: 'flex-end', marginBottom: 6 }}>
+            {attachments.map((a, i) => <AttachmentChip key={i} attachment={a} />)}
+          </div>
+        )}
+        {(content || attachments.length === 0) && (
+          <div style={{
+            background: 'var(--bubble-user)', border: '1px solid #c8e8b0',
+            color: 'var(--text-primary)', padding: '12px 16px',
+            borderRadius: '16px 16px 4px 16px',
+            fontSize: 14, lineHeight: 1.6, wordBreak: 'break-word',
+          }}>
+            {content}
+          </div>
+        )}
       </div>
     </div>
   )
@@ -73,7 +125,7 @@ function AssistantMessage({ content, streaming }) {
 }
 
 function makeConv(id, title, orchestrationId = null) {
-  return { id, title, orchestrationId, messages: [], loaded: false, processing: false }
+  return { id, title, orchestrationId, messages: [], downloadAttachments: [], loaded: false, processing: false }
 }
 
 export default function App() {
@@ -172,7 +224,12 @@ export default function App() {
       patchConv(convId, { orchestrationId: orchId })
     }
 
-    const userMsg = { role: 'user', content: text }
+    // Store attachments metadata with message (strip base64 data to save memory)
+    const attachmentsMeta = attachments.map(a => ({
+      name: a.name, type: a.type,
+      ...(a.type === 'image' ? { preview: a.dataUrl } : {}),
+    }))
+    const userMsg = { role: 'user', content: text, attachments: attachmentsMeta }
     patchConv(convId, {
       messages: [...(conversations.find(c => c.id === convId)?.messages ?? []), userMsg],
       processing: true,
@@ -182,6 +239,7 @@ export default function App() {
     setStreamingText('')
 
     let fullText = ''
+    const downloadAtts = []
     try {
       await sendChat({
         conversationId: convId,
@@ -192,10 +250,11 @@ export default function App() {
           fullText += chunk
           setStreamingText(fullText)
         },
+        onAttachment: (att) => { downloadAtts.push(att) },
         onDone: () => {},
       })
 
-      const assistantMsg = { role: 'assistant', content: fullText }
+      const assistantMsg = { role: 'assistant', content: fullText, downloads: downloadAtts }
       patchConv(convId, {
         messages: [...(conversations.find(c => c.id === convId)?.messages ?? []), userMsg, assistantMsg],
         processing: false,
@@ -282,9 +341,14 @@ export default function App() {
             {messages.map((msg, i) => {
               const isLastAssistant = msg.role === 'assistant' && i === messages.length - 1
               return msg.role === 'user'
-                ? <UserMessage key={i} content={msg.content} />
+                ? <UserMessage key={i} content={msg.content} attachments={msg.attachments} />
                 : <div key={i} ref={isLastAssistant ? lastAssistantRef : null}>
                     <AssistantMessage content={msg.content} streaming={false} />
+                    {msg.downloads?.length > 0 && (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 16, marginLeft: 40 }}>
+                        {msg.downloads.map((att, j) => <DownloadChip key={j} att={att} />)}
+                      </div>
+                    )}
                   </div>
             })}
 
