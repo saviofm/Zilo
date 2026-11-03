@@ -11,15 +11,18 @@ Proposta do RFP: **Caso 1** (chat corporativo com budget control) + **Caso 3** (
 ```
 Zilo/
 ├── ziloback/          # Backend CAP + apps admin Fiori Elements (MTA próprio)
-│   ├── db/            # Schema CDS (10 entidades)
+│   ├── db/            # Schema CDS (11 entidades)
 │   ├── srv/           # Serviços CAP + server.js (streaming SSE)
-│   ├── app/           # 5 apps admin Fiori Elements
-│   ├── scripts/       # Scripts de seed (modelos, personas)
+│   ├── app/           # 6 apps admin Fiori Elements
+│   ├── scripts/       # Scripts de seed (modelos, personas, políticas, cargos)
 │   └── mta.yaml
 ├── zilofront/         # Frontend React + Vite (chat UI, MTA próprio)
-│   ├── src/           # Componentes, rotas, API clients
+│   ├── src/
+│   │   ├── components/  # Sidebar, ConversationList, MessageInput, SessionExpiredScreen
+│   │   ├── api/         # chat, conversations, orchestrations, sessionGuard
+│   │   └── routes/      # ConsumptionRoute
 │   └── mta.yaml
-└── ZILO_ORCHESTRATION_CONFIGS.md  # Referência das 8 personas AI Core
+└── ZILO_ORCHESTRATION_CONFIGS.md
 ```
 
 ---
@@ -31,12 +34,12 @@ zilofront (React + Vite)
     │  SSE streaming
     ▼
 ziloback (CAP Node.js + Express)
-    │  config_ref → deploymentId
+    │  config_ref → deploymentId  (fallback: moduleConfigJson)
     ▼
-SAP AI Core Orchestration
-    ├── LLM (GPT / Gemini / Claude / Sonar Pro)
-    ├── Grounding (SAP Document Management)
-    ├── Masking (SAP Data Privacy Integration)
+SAP AI Core Orchestration (deployment d7a09bc4d6d523f7)
+    ├── LLM (GPT-5.6 Luna/Sol, Gemini 3.5 Flash, Claude Sonnet, Sonar Pro)
+    ├── Grounding (SAP Document Management — 5 personas)
+    ├── Masking (SAP DPI — 4 personas)
     └── Content Filter (Azure Content Safety + Prompt Shield)
 ```
 
@@ -44,7 +47,7 @@ SAP AI Core Orchestration
 
 | Serviço | Uso |
 |---|---|
-| SAP AI Core | LLM Orchestration (1 deployment, 8 personas via config_ref) |
+| SAP AI Core | LLM Orchestration (1 deployment, 8 personas) |
 | SAP HANA Cloud | Banco de dados (HDI) |
 | SAP Document Management | Data Repository para RAG (Caso 3) |
 | XSUAA | Autenticação |
@@ -57,14 +60,14 @@ SAP AI Core Orchestration
 
 | Persona | Modelo | Grounding | Masking |
 |---|---|---|---|
-| Zilo Base | GPT-6 Luna | ❌ | ❌ |
-| Zilo Base Docs | GPT-6 Luna | ✅ SDM | ❌ |
+| Zilo Base | GPT-5.6 Luna | ❌ | ❌ |
+| Zilo Base Docs | GPT-5.6 Luna | ✅ SDM | ❌ |
 | Zilo Advanced Docs GPT | GPT-5.6 Sol | ✅ SDM | ✅ |
 | Zilo Advanced Docs Gemini | Gemini 3.5 Flash | ✅ SDM | ✅ |
 | Zilo Executive Docs Claude | Claude Sonnet 4.6 | ✅ SDM | ✅ |
-| Zilo Executive Docs Astra | GPT-6 Astra | ✅ SDM | ✅ |
+| Zilo Executive Docs Astra | GPT-5.6 Sol | ✅ SDM | ✅ |
 | Zilo Pesquisa Web | Sonar Pro (Perplexity) | ❌ web nativo | ✅ |
-| Zilo SAP Help | GPT-6 Luna | ✅ help.sap.com | ❌ |
+| Zilo SAP Help | GPT-5.6 Luna | ✅ help.sap.com | ❌ |
 
 ---
 
@@ -73,8 +76,8 @@ SAP AI Core Orchestration
 | Entidade | Descrição |
 |---|---|
 | `ModelCatalog` | Modelos com preços em CU/1k tokens |
-| `OrchestrationConfig` | Personas (deploymentId + aicoreConfigId) |
-| `CostPolicy` | Budget mensal em CU + orquestrações permitidas |
+| `OrchestrationConfig` | Personas (deploymentId + aicoreConfigId + moduleConfigJson + groundingEnabled) |
+| `CostPolicy` | Budget mensal (Integer CU) + orquestrações permitidas |
 | `PolicyOrchestrations` | M:N entre CostPolicy e OrchestrationConfig |
 | `JobRole` | Cargo com departamento, diretoria e policy padrão |
 | `UserProfile` | Usuário (userId = XSUAA sub) vinculado ao JobRole |
@@ -106,4 +109,6 @@ cf deploy mta_archives/zilofront_1.0.0.mtar
 cd ziloback
 node scripts/seed-models.mjs          # ModelCatalog (59 modelos)
 node scripts/seed-orchestrations.mjs  # OrchestrationConfig (8 personas)
+node scripts/seed-policies.mjs        # CostPolicy (5 políticas)
+node scripts/seed-jobroles.mjs        # JobRole (8 cargos)
 ```
