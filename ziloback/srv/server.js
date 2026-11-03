@@ -82,7 +82,11 @@ cds.on('served', () => {
 
       // ── 4. Load chat history ──────────────────────────────────────────────────
       const history = await SELECT.from(Messages).where({ conversation_id: conversationId }).orderBy('seq asc');
-      const messages = history.map(m => ({ role: m.role, content: _extractText(m.content) }));
+      // Include current user message at the end — it hasn't been persisted yet
+      const messages = [
+        ...history.map(m => ({ role: m.role, content: _extractText(m.content) })),
+        { role: 'user', content: message },
+      ];
 
       // ── 5. Create orchestration client ────────────────────────────────────────
       const client = await createOrchestrationClient(orch);

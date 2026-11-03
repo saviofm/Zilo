@@ -27,6 +27,7 @@ entity OrchestrationConfig {
       deploymentId           : String(100);   // AI Core ML Ops deployment ID (shared)
       aicoreConfigId         : String(100);   // Gen AI Hub Orchestration Config UUID (reference only)
       moduleConfigJson       : LargeString;   // JSON of modules block exported from AI Launchpad
+      groundingEnabled       : Boolean default false; // true = pass grounding_input_variable_1 as placeholder
       model                  : Association to ModelCatalog; // for cost calculation only
       orchestrationCUPerCall : Decimal(10,6) default 0.0001;
       isActive               : Boolean default true;

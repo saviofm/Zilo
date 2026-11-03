@@ -10,7 +10,7 @@ import { fetchUser } from './api/user'
 import { fetchMyOrchestrations, fetchBudgetStatus } from './api/orchestrations'
 import {
   listConversations, createConversation, loadConversation,
-  appendMessage, renameConversation, deleteConversation,
+  renameConversation, deleteConversation,
 } from './api/conversations'
 
 function UserMessage({ content }) {
@@ -24,6 +24,29 @@ function UserMessage({ content }) {
         fontSize: 14, lineHeight: 1.6, maxWidth: '65%', wordBreak: 'break-word',
       }}>
         {content}
+      </div>
+    </div>
+  )
+}
+
+function ThinkingMessage() {
+  return (
+    <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: 20, gap: 10 }}>
+      <div style={{
+        width: 30, height: 30, borderRadius: '50%', flexShrink: 0, marginTop: 2,
+        background: '#fff', border: '1.5px solid var(--border)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 2,
+      }}>
+        <img src="/logo_simples.png" alt="Zilo" style={{ width: 22, height: 22, objectFit: 'contain' }} />
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '10px 0' }}>
+        {[0, 1, 2].map(i => (
+          <div key={i} style={{
+            width: 7, height: 7, borderRadius: '50%',
+            background: 'var(--joule)', opacity: 0.5,
+            animation: `thinkingPulse 1.2s ease-in-out ${i * 0.2}s infinite`,
+          }} />
+        ))}
       </div>
     </div>
   )
@@ -145,12 +168,7 @@ export default function App() {
         messages: [...(conversations.find(c => c.id === convId)?.messages ?? []), userMsg, assistantMsg],
         processing: false,
       })
-
-      if (!String(convId).startsWith('local-')) {
-        const seq = messages.length
-        appendMessage(convId, seq, 'user', [{ type: 'text', text }]).catch(() => {})
-        appendMessage(convId, seq + 1, 'assistant', [{ type: 'text', text: fullText }]).catch(() => {})
-      }
+      // Backend (server.js) already persists both messages — no appendMessage needed here.
     } catch (err) {
       patchConv(convId, {
         messages: [...(conversations.find(c => c.id === convId)?.messages ?? []), userMsg,
@@ -234,6 +252,7 @@ export default function App() {
                 : <AssistantMessage key={i} content={msg.content} streaming={false} />
             )}
 
+            {isStreaming && !streamingText && <ThinkingMessage />}
             {isStreaming && streamingText && (
               <AssistantMessage content={streamingText} streaming={true} />
             )}

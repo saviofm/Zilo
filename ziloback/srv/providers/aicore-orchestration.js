@@ -35,7 +35,13 @@ export async function createOrchestrationClient(orch) {
 
   return {
     async complete({ messages = [], stream = false }) {
-      const request = messages.length ? { messagesHistory: messages } : {};
+      const lastUserMsg = [...messages].reverse().find(m => m.role === 'user')?.content ?? '';
+      const request = {
+        ...(messages.length ? { messagesHistory: messages } : {}),
+        // Only pass grounding placeholder when grounding is enabled for this persona.
+        // Sending unused placeholders causes a 400 from the orchestration service.
+        ...(orch.groundingEnabled && { placeholderValues: { grounding_input_variable_1: lastUserMsg } }),
+      };
       const hasRef = typeof config === 'object' && 'id' in config;
       log.debug({ deploymentId: DEPLOYMENT_ID, hasConfigRef: hasRef, stream }, 'orchestration request');
 

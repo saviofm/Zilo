@@ -5,6 +5,7 @@ annotate AdminService.OrchestrationConfig with @(
   UI.LineItem: [
     { Value: name },
     { Value: model_id,               Label: 'Model' },
+    { Value: groundingEnabled,       Label: 'Grounding' },
     { Value: aicoreConfigId,         Label: 'AI Launchpad Config ID' },
     { Value: orchestrationCUPerCall, Label: 'CU/Call' },
     { Value: sortOrder,              Label: 'Ordem' },
@@ -23,6 +24,7 @@ annotate AdminService.OrchestrationConfig with @(
       { Value: description },
       { Value: deploymentId,           Label: 'AI Core Deployment ID (ML Ops)' },
       { Value: aicoreConfigId,         Label: 'Orchestration Config ID (AI Launchpad)' },
+      { Value: groundingEnabled,       Label: 'Grounding ativo' },
       { Value: model_id,               Label: 'Model (para cálculo de custo)' },
       { Value: orchestrationCUPerCall, Label: 'CU por chamada' },
       { Value: sortOrder,              Label: 'Ordem de exibição' },
