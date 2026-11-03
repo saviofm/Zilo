@@ -1,0 +1,37 @@
+_schema-version: "3.1"
+ID: zilofinopps
+version: 1.0.0
+description: Zilo FinOps — Analytics & Budget dashboard for administrators
+
+modules:
+  - name: zilofinopps-approuter
+    type: approuter.nodejs
+    path: approuter
+    parameters:
+      buildpack: nodejs_buildpack
+      disk-quota: 512M
+      memory: 128M
+      routes:
+        - route: zilofinopps.cfapps.us10-001.hana.ondemand.com
+    properties:
+      destinations: >
+        [{"name":"zilo-backend","url":"https://org-build-build-ziloback-srv.cfapps.us10-001.hana.ondemand.com","forwardAuthToken":true,"timeout":300000}]
+      BACKEND_TIMEOUT: 300000
+      SESSION_TIMEOUT: 1440
+    build-parameters:
+      builder: custom
+      commands:
+        - npm install --prefix ../
+        - npm run build --prefix ../
+        - mkdir -p resources
+        - cp -r ../dist/. resources/
+        - npm install --omit=dev
+      build-result: .
+    requires:
+      - name: zilo-xsuaa
+
+resources:
+  - name: zilo-xsuaa
+    type: org.cloudfoundry.existing-service
+    parameters:
+      service-name: zilo-xsuaa

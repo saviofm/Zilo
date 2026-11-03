@@ -26,4 +26,47 @@ service AdminService @(path: '/api/admin') {
 
   // Recompute MonthlyUsageSummary for a given yearMonth (e.g. "2026-10")
   action recomputeSummary(yearMonth : String(7)) returns String;
+
+  // ── FinOps analytical functions ───────────────────────────────────────────
+
+  // Monthly trend — all users combined (last N months or range)
+  function usageByMonth(months : Integer) returns array of {
+    yearMonth  : String;
+    totalCU    : Decimal;
+    totalCalls : Integer;
+  };
+
+  // Usage broken down by LLM model (for a given month, or all-time if null)
+  function usageByModel(yearMonth : String(7)) returns array of {
+    modelId    : String;
+    modelName  : String;
+    provider   : String;
+    totalCU    : Decimal;
+    totalCalls : Integer;
+    sharePct   : Decimal;
+  };
+
+  // Usage broken down by JobRole / department / directorate
+  function usageByJobRole(yearMonth : String(7)) returns array of {
+    jobRoleId   : String;
+    jobRoleName : String;
+    department  : String;
+    directorate : String;
+    totalCU     : Decimal;
+    totalCalls  : Integer;
+    userCount   : Integer;
+  };
+
+  // Drill-down to individual users
+  function usageByUser(yearMonth : String(7)) returns array of {
+    userId      : String;
+    displayName : String;
+    email       : String;
+    jobRoleName : String;
+    department  : String;
+    totalCU     : Decimal;
+    totalCalls  : Integer;
+    budgetCU    : Integer;
+    percentUsed : Decimal;
+  };
 }
