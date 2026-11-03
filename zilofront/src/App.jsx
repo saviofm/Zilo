@@ -7,6 +7,7 @@ import Markdown from './components/Markdown'
 import ConsumptionRoute from './routes/ConsumptionRoute'
 import SessionExpiredScreen from './components/SessionExpiredScreen'
 import { downloadAsExcel, downloadAsCSV, downloadAsJSON } from './api/files.js'
+import ChartBlock from './components/ChartBlock'
 import { sendChat } from './api/chat'
 import { fetchUser } from './api/user'
 import { fetchMyOrchestrations, fetchBudgetStatus } from './api/orchestrations'
@@ -17,14 +18,28 @@ import {
 
 function AttachmentChip({ attachment }) {
   const isImg = attachment.type === 'image'
+
+  function handleClick() {
+    if (isImg && attachment.preview) {
+      // Download image
+      const a = document.createElement('a')
+      a.href = attachment.preview
+      a.download = attachment.name
+      a.click()
+    }
+    // For docs, text was extracted — nothing to download (already sent to AI)
+  }
+
   return (
-    <div style={{
-      display: 'inline-flex', alignItems: 'center', gap: 5,
-      background: isImg ? '#e8f5e3' : '#f3f4f6',
-      border: `1px solid ${isImg ? 'var(--accent)' : 'var(--border)'}`,
-      borderRadius: 7, padding: '3px 8px', fontSize: 11, fontWeight: 500,
-      color: 'var(--text-primary)', maxWidth: 180,
-    }}>
+    <div onClick={isImg ? handleClick : undefined}
+      style={{
+        display: 'inline-flex', alignItems: 'center', gap: 5,
+        background: isImg ? '#e8f5e3' : '#f3f4f6',
+        border: `1px solid ${isImg ? 'var(--accent)' : 'var(--border)'}`,
+        borderRadius: 7, padding: '3px 8px', fontSize: 11, fontWeight: 500,
+        color: 'var(--text-primary)', maxWidth: 180,
+        cursor: isImg ? 'pointer' : 'default',
+      }}>
       {isImg
         ? <svg viewBox="0 0 14 14" width="10" height="10" fill="none"><rect x="1" y="1" width="12" height="12" rx="2" stroke="var(--accent)" strokeWidth="1.3"/><circle cx="4.5" cy="4.5" r="1.2" fill="var(--accent)"/><path d="M1 10l3.5-3.5 2.5 2.5 1.5-1.5L13 12" stroke="var(--accent)" strokeWidth="1.1" strokeLinecap="round" strokeLinejoin="round"/></svg>
         : <svg viewBox="0 0 14 14" width="10" height="10" fill="none"><path d="M2 1h7l3 3v9H2V1z" stroke="var(--text-muted)" strokeWidth="1.2" strokeLinejoin="round"/><path d="M9 1v3h3" stroke="var(--text-muted)" strokeWidth="1.2" strokeLinejoin="round"/></svg>
@@ -345,8 +360,19 @@ export default function App() {
                 : <div key={i} ref={isLastAssistant ? lastAssistantRef : null}>
                     <AssistantMessage content={msg.content} streaming={false} />
                     {msg.downloads?.length > 0 && (
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 16, marginLeft: 40 }}>
-                        {msg.downloads.map((att, j) => <DownloadChip key={j} att={att} />)}
+                      <div style={{ marginLeft: 40, marginBottom: 8 }}>
+                        {/* Charts */}
+                        {msg.downloads.filter(d => d.isChart).map((d, j) => (
+                          <ChartBlock key={`chart-${j}`} data={d.data} />
+                        ))}
+                        {/* Download chips */}
+                        {msg.downloads.filter(d => !d.isChart).length > 0 && (
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 8 }}>
+                            {msg.downloads.filter(d => !d.isChart).map((att, j) => (
+                              <DownloadChip key={`dl-${j}`} att={att} />
+                            ))}
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>

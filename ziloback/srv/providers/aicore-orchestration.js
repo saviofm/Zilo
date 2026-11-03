@@ -37,20 +37,48 @@ export async function createOrchestrationClient(orch) {
     async complete({ messages = [], stream = false }) {
       let request;
 
+      // Tools available to all non-grounding personas (grounding uses placeholders instead)
+      const CHART_TOOL = {
+        type: 'function',
+        function: {
+          name: 'render_chart',
+          description: 'Render an inline chart. Use whenever a comparison, trend, or distribution would be clearer as a visualization. Always prefer this over markdown tables for numerical data.',
+          parameters: {
+            type: 'object',
+            required: ['type', 'title', 'categories', 'series'],
+            properties: {
+              type: { type: 'string', enum: ['line', 'bar', 'stacked-bar', 'pie'] },
+              title: { type: 'string' },
+              subtitle: { type: 'string' },
+              categories: { type: 'array', items: { type: 'string' }, description: 'X-axis labels or pie slice labels' },
+              series: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  required: ['name', 'values'],
+                  properties: {
+                    name: { type: 'string' },
+                    values: { type: 'array', items: { type: 'number' } },
+                  },
+                },
+              },
+            },
+          },
+        },
+      };
+
       if (orch.groundingEnabled) {
-        // Grounding personas: template has {{?grounding_input_variable_1}} as user message.
-        // Current user message goes as placeholderValues; prior history goes in messagesHistory.
-        // The grounding service uses the input placeholder for vector search and injects
-        // retrieved docs into {{?grounding_output_variable}} before calling the LLM.
         const currentUserMsg = [...messages].reverse().find(m => m.role === 'user')?.content ?? '';
-        const history = messages.slice(0, -1); // all except last user message
+        const history = messages.slice(0, -1);
         request = {
           placeholderValues: { grounding_input_variable_1: currentUserMsg },
           ...(history.length && { messagesHistory: history }),
         };
       } else {
-        // Non-grounding personas: all messages go as history (template has no placeholders).
-        request = messages.length ? { messagesHistory: messages } : {};
+        request = {
+          ...(messages.length ? { messagesHistory: messages } : {}),
+          tools: [CHART_TOOL],
+        };
       }
       const hasRef = typeof config === 'object' && 'id' in config;
       log.debug({ deploymentId: DEPLOYMENT_ID, hasConfigRef: hasRef, stream }, 'orchestration request');

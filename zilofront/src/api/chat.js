@@ -32,6 +32,7 @@ export async function sendChat({ conversationId, message, orchestrationId, attac
         const parsed = JSON.parse(raw)
         if (parsed.type === 'delta' && parsed.text) onDelta(parsed.text)
         if (parsed.type === 'attachment') onAttachment?.(parsed)
+        if (parsed.type === 'chart') onAttachment?.({ ...parsed, isChart: true })
         if (parsed.type === 'done') onDone(parsed)
       } catch { /* SSE comment */ }
     }

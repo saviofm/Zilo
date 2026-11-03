@@ -160,16 +160,45 @@ cds.on('served', () => {
         }
       }
 
-      // ── 8. Detect downloadable blocks + emit attachment events ───────────────
-      if (stream && fullText) {
-        const blockRe = /```(csv|json|xlsx|tsv)(:[^\n]*)?\n([\s\S]*?)```/gi;
-        let m;
-        while ((m = blockRe.exec(fullText)) !== null) {
-          const format   = m[1].toLowerCase();
-          const filename = m[2] ? m[2].slice(1).trim() : `dados.${format === 'xlsx' ? 'xlsx' : format}`;
-          const data     = m[3].trim();
-          if (data) {
-            res.write(`data: ${JSON.stringify({ type: 'attachment', format, filename, data })}\n\n`);
+      // ── 8. Detect charts, downloadable blocks, Markdown tables ──────────────
+      if (stream) {
+        // a) tool_calls from non-streaming response
+        const toolCalls = result.data?.getToolCalls?.() ?? null;
+        if (toolCalls) {
+          for (const tc of toolCalls) {
+            if (tc.function?.name === 'render_chart') {
+              try {
+                const chartData = typeof tc.function.arguments === 'string'
+                  ? JSON.parse(tc.function.arguments) : tc.function.arguments;
+                res.write(`data: ${JSON.stringify({ type: 'chart', data: chartData })}\n\n`);
+              } catch { /* ignore malformed */ }
+            }
+          }
+        }
+
+        // b) code blocks: ```csv, ```json, ```xlsx
+        if (fullText) {
+          const blockRe = /```(csv|json|xlsx|tsv)(:[^\n]*)?\n([\s\S]*?)```/gi;
+          let m;
+          while ((m = blockRe.exec(fullText)) !== null) {
+            const format   = m[1].toLowerCase();
+            const filename = m[2] ? m[2].slice(1).trim() : `dados.${format === 'xlsx' ? 'xlsx' : format}`;
+            const data     = m[3].trim();
+            if (data) res.write(`data: ${JSON.stringify({ type: 'attachment', format, filename, data })}\n\n`);
+          }
+
+          // c) Markdown tables — convert to CSV and emit as attachment
+          const tableRe = /(\|.+\|\n\|[-: |]+\|\n(?:\|.+\|\n?)+)/g;
+          let tm; let tableIdx = 0;
+          while ((tm = tableRe.exec(fullText)) !== null) {
+            const rows = tm[1].trim().split('\n')
+              .filter(r => !r.match(/^\|[-: |]+\|$/))
+              .map(r => r.split('|').slice(1,-1).map(c => c.trim()).join(','));
+            if (rows.length > 1) {
+              const csv = rows.join('\n');
+              tableIdx++;
+              res.write(`data: ${JSON.stringify({ type: 'attachment', format: 'csv', filename: `tabela${tableIdx > 1 ? '_' + tableIdx : ''}.xlsx`, data: csv })}\n\n`);
+            }
           }
         }
       }
