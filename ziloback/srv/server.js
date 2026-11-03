@@ -42,7 +42,7 @@ cds.on('served', () => {
     if (!uid) return res.status(401).json({ error: 'Unauthenticated' });
 
     const { conversationId, message, orchestrationId, attachments = [], stream = true } = req.body ?? {};
-    if (!conversationId || !message?.trim()) {
+    if (!conversationId || (!message?.trim() && attachments.length === 0)) {
       return res.status(400).json({ error: 'conversationId and message are required' });
     }
 
@@ -107,11 +107,23 @@ cds.on('served', () => {
       const client = await createOrchestrationClient(orch);
 
       // ── 6. Persist user message ───────────────────────────────────────────────
+      // Store attachments as text blocks so they appear in history for future messages.
+      // Images are stored as a reference (not base64) to avoid bloating the DB.
       const nextSeq = (history.at(-1)?.seq ?? 0) + 1;
+      const persistedContent = attachments.length > 0
+        ? [
+            { type: 'text', text: message || 'Analise os arquivos anexados.' },
+            ...attachments.map(a => a.type === 'image'
+              ? { type: 'text', text: `[Imagem anexada: ${a.name}]` }
+              : { type: 'text', text: `[Arquivo: ${a.name}]\n${a.text}` }
+            ),
+          ]
+        : [{ type: 'text', text: message }];
+
       await INSERT.into(Messages).entries({
         id: cds.utils.uuid(), conversation_id: conversationId,
         seq: nextSeq, role: 'user',
-        content: JSON.stringify([{ type: 'text', text: message }]),
+        content: JSON.stringify(persistedContent),
         createdAt: new Date().toISOString(),
       });
 
