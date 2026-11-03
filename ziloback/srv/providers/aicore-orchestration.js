@@ -37,9 +37,6 @@ export async function createOrchestrationClient(orch) {
     async complete({ messages = [], stream = false }) {
       const request = messages.length ? { messagesHistory: messages } : {};
       const hasRef = typeof config === 'object' && 'id' in config;
-      // Force non-streaming for now — gpt-5.6-luna via orchestration deployment
-      // returns "Error while iterating over SSE stream" when streaming is enabled.
-      stream = false;
       log.debug({ deploymentId: DEPLOYMENT_ID, hasConfigRef: hasRef, stream }, 'orchestration request');
 
       const attemptComplete = async (c, useStream) => {
@@ -80,8 +77,14 @@ export async function createOrchestrationClient(orch) {
         // config_ref failed — retry with inline moduleConfigJson
         if (hasRef && orch.moduleConfigJson) {
           log.info('config_ref failed — retrying with inline moduleConfigJson');
-          const fallbackClient = new OrchestrationClient(orch.moduleConfigJson, deploymentConfig, destination);
-          return await tryComplete(fallbackClient, stream);
+          try {
+            const fallbackClient = new OrchestrationClient(orch.moduleConfigJson, deploymentConfig, destination);
+            return await tryComplete(fallbackClient, stream);
+          } catch (err2) {
+            const body2 = err2.response?.data ?? err2.cause?.response?.data ?? null;
+            log.error({ status: err2.response?.status ?? 500, body: body2, err: err2.message }, 'inline fallback also failed');
+            throw err2;
+          }
         }
 
         throw err;
