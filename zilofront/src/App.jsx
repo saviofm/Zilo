@@ -18,32 +18,35 @@ import {
 
 function AttachmentChip({ attachment }) {
   const isImg = attachment.type === 'image'
+  const ext = attachment.name?.split('.').pop()?.toLowerCase() ?? ''
+  const icon = isImg ? '🖼️' : ext === 'pdf' ? '📕' : ['xlsx','xls','csv'].includes(ext) ? '📊' : ['docx','doc'].includes(ext) ? '📄' : '📎'
 
   function handleClick() {
     if (isImg && attachment.preview) {
-      // Download image
       const a = document.createElement('a')
       a.href = attachment.preview
       a.download = attachment.name
       a.click()
+    } else if (!isImg && attachment.text) {
+      // Download extracted text as .txt so user can verify what was sent to AI
+      const blob = new Blob([attachment.text], { type: 'text/plain;charset=utf-8' })
+      const url  = URL.createObjectURL(blob)
+      const a    = document.createElement('a')
+      a.href = url; a.download = attachment.name + '.txt'; a.click()
+      URL.revokeObjectURL(url)
     }
-    // For docs, text was extracted — nothing to download (already sent to AI)
   }
 
   return (
-    <div onClick={isImg ? handleClick : undefined}
+    <div onClick={handleClick} title={isImg ? 'Clique para baixar imagem' : 'Clique para ver texto extraído'}
       style={{
         display: 'inline-flex', alignItems: 'center', gap: 5,
         background: isImg ? '#e8f5e3' : '#f3f4f6',
         border: `1px solid ${isImg ? 'var(--accent)' : 'var(--border)'}`,
         borderRadius: 7, padding: '3px 8px', fontSize: 11, fontWeight: 500,
-        color: 'var(--text-primary)', maxWidth: 180,
-        cursor: isImg ? 'pointer' : 'default',
+        color: 'var(--text-primary)', maxWidth: 180, cursor: 'pointer',
       }}>
-      {isImg
-        ? <svg viewBox="0 0 14 14" width="10" height="10" fill="none"><rect x="1" y="1" width="12" height="12" rx="2" stroke="var(--accent)" strokeWidth="1.3"/><circle cx="4.5" cy="4.5" r="1.2" fill="var(--accent)"/><path d="M1 10l3.5-3.5 2.5 2.5 1.5-1.5L13 12" stroke="var(--accent)" strokeWidth="1.1" strokeLinecap="round" strokeLinejoin="round"/></svg>
-        : <svg viewBox="0 0 14 14" width="10" height="10" fill="none"><path d="M2 1h7l3 3v9H2V1z" stroke="var(--text-muted)" strokeWidth="1.2" strokeLinejoin="round"/><path d="M9 1v3h3" stroke="var(--text-muted)" strokeWidth="1.2" strokeLinejoin="round"/></svg>
-      }
+      <span>{icon}</span>
       <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{attachment.name}</span>
     </div>
   )
@@ -239,10 +242,12 @@ export default function App() {
       patchConv(convId, { orchestrationId: orchId })
     }
 
-    // Store attachments metadata with message (strip base64 data to save memory)
+    // Store attachments with enough data for chip download
+    // Images: keep dataUrl for download preview
+    // Docs: keep extracted text so user can download/verify what was sent to AI
     const attachmentsMeta = attachments.map(a => ({
       name: a.name, type: a.type,
-      ...(a.type === 'image' ? { preview: a.dataUrl } : {}),
+      ...(a.type === 'image' ? { preview: a.dataUrl } : { text: a.text }),
     }))
     const userMsg = { role: 'user', content: text, attachments: attachmentsMeta }
     patchConv(convId, {
