@@ -17,6 +17,35 @@ const log = createLogger('aicore-orchestration');
 
 const DEPLOYMENT_ID = 'd7a09bc4d6d523f7';
 
+const CHART_TOOL = {
+  type: 'function',
+  function: {
+    name: 'render_chart',
+    description: 'Render an inline chart. Use whenever a comparison, trend, or distribution would be clearer as a visualization. Always prefer this over markdown tables for numerical data.',
+    parameters: {
+      type: 'object',
+      required: ['type', 'title', 'categories', 'series'],
+      properties: {
+        type: { type: 'string', enum: ['line', 'bar', 'stacked-bar', 'pie'] },
+        title: { type: 'string' },
+        subtitle: { type: 'string' },
+        categories: { type: 'array', items: { type: 'string' }, description: 'X-axis labels or pie slice labels' },
+        series: {
+          type: 'array',
+          items: {
+            type: 'object',
+            required: ['name', 'values'],
+            properties: {
+              name: { type: 'string' },
+              values: { type: 'array', items: { type: 'number' } },
+            },
+          },
+        },
+      },
+    },
+  },
+};
+
 export async function createOrchestrationClient(orch) {
   const { OrchestrationClient } = await import('@sap-ai-sdk/orchestration');
   const { getAiCoreDestination } = await import('@sap-ai-sdk/core');
@@ -24,9 +53,22 @@ export async function createOrchestrationClient(orch) {
   const destination = await getAiCoreDestination();
   const deploymentConfig = { deploymentId: DEPLOYMENT_ID, resourceGroup: 'default' };
 
-  // Prefer config_ref, fall back to inline JSON
+  // Prefer config_ref, fall back to inline JSON.
+  // For non-grounding personas: inject render_chart tool via overrideConfig.
+  // Grounding personas skip tools (they use placeholder-based templates).
   const config = orch.aicoreConfigId
-    ? { id: orch.aicoreConfigId }
+    ? {
+        id: orch.aicoreConfigId,
+        ...(!orch.groundingEnabled && {
+          overrideConfig: {
+            modules: {
+              prompt_templating: {
+                prompt: { tools: [CHART_TOOL] },
+              },
+            },
+          },
+        }),
+      }
     : orch.moduleConfigJson;
 
   if (!config) throw new Error(`OrchestrationConfig ${orch.id} has neither aicoreConfigId nor moduleConfigJson`);
@@ -37,36 +79,6 @@ export async function createOrchestrationClient(orch) {
     async complete({ messages = [], stream = false }) {
       let request;
 
-      // Tools available to all non-grounding personas (grounding uses placeholders instead)
-      const CHART_TOOL = {
-        type: 'function',
-        function: {
-          name: 'render_chart',
-          description: 'Render an inline chart. Use whenever a comparison, trend, or distribution would be clearer as a visualization. Always prefer this over markdown tables for numerical data.',
-          parameters: {
-            type: 'object',
-            required: ['type', 'title', 'categories', 'series'],
-            properties: {
-              type: { type: 'string', enum: ['line', 'bar', 'stacked-bar', 'pie'] },
-              title: { type: 'string' },
-              subtitle: { type: 'string' },
-              categories: { type: 'array', items: { type: 'string' }, description: 'X-axis labels or pie slice labels' },
-              series: {
-                type: 'array',
-                items: {
-                  type: 'object',
-                  required: ['name', 'values'],
-                  properties: {
-                    name: { type: 'string' },
-                    values: { type: 'array', items: { type: 'number' } },
-                  },
-                },
-              },
-            },
-          },
-        },
-      };
-
       if (orch.groundingEnabled) {
         const currentUserMsg = [...messages].reverse().find(m => m.role === 'user')?.content ?? '';
         const history = messages.slice(0, -1);
@@ -75,8 +87,8 @@ export async function createOrchestrationClient(orch) {
           ...(history.length && { messagesHistory: history }),
         };
       } else {
-        // Tools go in messagesHistory context — SDK passes them via the config object.
-        // The CHART_TOOL is injected into the moduleConfigJson prompt.tools array below.
+        // Tools injected via overrideConfig in the client constructor (config_ref path)
+        // or via moduleConfigJson.prompt.tools (fallback path).
         request = messages.length ? { messagesHistory: messages } : {};
       }
       const hasRef = typeof config === 'object' && 'id' in config;
