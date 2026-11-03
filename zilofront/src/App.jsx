@@ -88,6 +88,7 @@ export default function App() {
   const [selectedOrchId, setSelectedOrchId] = useState(null)
   const [budgetStatus, setBudgetStatus] = useState(null)
   const [sessionExpired, setSessionExpired] = useState(false)
+  const [consumptionRefresh, setConsumptionRefresh] = useState(0)
   const bottomRef = useRef(null)
   const scrollContainerRef = useRef(null)
   const lastAssistantRef = useRef(null)
@@ -208,6 +209,7 @@ export default function App() {
       setIsStreaming(false)
       setStreamingText('')
       fetchBudgetStatus().then(setBudgetStatus).catch(() => {})
+      setConsumptionRefresh(r => r + 1)
     }
   }
 
@@ -309,7 +311,7 @@ export default function App() {
         </div>
       )}
 
-      {activeNav === 'consumption' && <ConsumptionRoute />}
+      {activeNav === 'consumption' && <ConsumptionRoute refreshTrigger={consumptionRefresh} />}
 
       {sessionExpired && <SessionExpiredScreen />}
     </div>

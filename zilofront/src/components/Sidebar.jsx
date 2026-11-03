@@ -113,7 +113,7 @@ function BudgetBar({ budgetStatus, collapsed }) {
   return (
     <div style={{ padding: '8px 16px 4px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'rgba(255,255,255,0.6)', marginBottom: 4 }}>
-        <span>Budget mensal</span>
+        <span>Créditos de IA</span>
         <span style={{ color, fontWeight: 700 }}>{pct}%</span>
       </div>
       <div style={{ height: 4, background: 'rgba(255,255,255,0.2)', borderRadius: 99, overflow: 'hidden' }}>

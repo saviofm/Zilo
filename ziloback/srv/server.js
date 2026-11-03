@@ -162,6 +162,9 @@ cds.on('served', () => {
         res.json({ text: fullText, ledger: ledgerEntry ? { totalCU: ledgerEntry.totalCU } : null });
       }
 
+      // Fire-and-forget: keep MonthlyUsageSummary fresh after each chat
+      _recomputeSummaryAsync(db, uid).catch(() => {});
+
     } catch (err) {
       log.error({ err: err.message, uid, conversationId }, 'chat error');
       const status = err.response?.status ?? err.cause?.response?.status ?? 500;
@@ -215,6 +218,25 @@ async function _resolvePolicy(db, userId) {
     return role?.policy_id ?? null;
   })();
   return policyId ? SELECT.one(CostPolicy).where({ id: policyId }) : null;
+}
+
+async function _recomputeSummaryAsync(db, userId) {
+  const { TokenLedger, MonthlyUsageSummary, UserProfile, JobRole, CostPolicy } = db.entities('zilo');
+  const yearMonth = new Date().toISOString().slice(0, 7);
+  const rows = await SELECT.from(TokenLedger)
+    .columns('SUM(totalCU) as totalCU', 'COUNT(*) as totalCalls')
+    .where({ userId })
+    .and(`timestamp LIKE '${yearMonth}%'`);
+  const totalCU = Number(rows[0]?.totalCU ?? 0);
+  const totalCalls = Number(rows[0]?.totalCalls ?? 0);
+  const policy = await _resolvePolicy(db, userId);
+  const budgetCU = Number(policy?.monthlyBudgetCU ?? 0);
+  const percentUsed = budgetCU > 0 ? Math.round((totalCU / budgetCU) * 10000) / 100 : 0;
+  await UPSERT.into(MonthlyUsageSummary).entries({
+    id: cds.utils.uuid(), userId, yearMonth,
+    totalCU, totalCalls, budgetCU, percentUsed,
+    computedAt: new Date().toISOString(),
+  });
 }
 
 async function _usedCUThisMonth(db, userId) {
