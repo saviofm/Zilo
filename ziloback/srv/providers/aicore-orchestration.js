@@ -75,10 +75,9 @@ export async function createOrchestrationClient(orch) {
           ...(history.length && { messagesHistory: history }),
         };
       } else {
-        request = {
-          ...(messages.length ? { messagesHistory: messages } : {}),
-          tools: [CHART_TOOL],
-        };
+        // Tools go in messagesHistory context — SDK passes them via the config object.
+        // The CHART_TOOL is injected into the moduleConfigJson prompt.tools array below.
+        request = messages.length ? { messagesHistory: messages } : {};
       }
       const hasRef = typeof config === 'object' && 'id' in config;
       log.debug({ deploymentId: DEPLOYMENT_ID, hasConfigRef: hasRef, stream }, 'orchestration request');

@@ -144,6 +144,19 @@ cds.on('served', () => {
           }
           usageData = result.streamResp.getTokenUsage?.() ?? result.streamResp.getUsage?.() ?? null;
           log.info({ usageData }, 'chat streaming usage');
+          // Extract tool_calls from stream after completion
+          const streamToolCalls = result.streamResp.getToolCalls?.() ?? null;
+          if (streamToolCalls?.length) {
+            for (const tc of streamToolCalls) {
+              if (tc.function?.name === 'render_chart') {
+                try {
+                  const chartData = typeof tc.function.arguments === 'string'
+                    ? JSON.parse(tc.function.arguments) : tc.function.arguments;
+                  res.write(`data: ${JSON.stringify({ type: 'chart', data: chartData })}\n\n`);
+                } catch { /* ignore */ }
+              }
+            }
+          }
         } finally {
           clearInterval(heartbeat);
         }
@@ -162,7 +175,7 @@ cds.on('served', () => {
 
       // ── 8. Detect charts, downloadable blocks, Markdown tables ──────────────
       if (stream) {
-        // a) tool_calls from non-streaming response
+        // a) tool_calls from non-streaming response (SDK method)
         const toolCalls = result.data?.getToolCalls?.() ?? null;
         if (toolCalls) {
           for (const tc of toolCalls) {
