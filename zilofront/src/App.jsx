@@ -148,8 +148,9 @@ export default function App() {
     setConversations(prev => prev.map(c => c.id === id ? { ...c, ...patch } : c))
   }
 
-  async function handleSend(text) {
-    if (!text.trim() || isStreaming) return
+  async function handleSend(text, attachments = []) {
+    if (!text.trim() && attachments.length === 0) return
+    if (isStreaming) return
 
     let convId = activeConvId
     const orchId = selectedOrchId  // always use the selector's current choice
@@ -185,7 +186,8 @@ export default function App() {
       await sendChat({
         conversationId: convId,
         message: text,
-        orchestrationId: orchId,  // send current persona selection per message
+        orchestrationId: orchId,
+        attachments,
         onDelta: (chunk) => {
           fullText += chunk
           setStreamingText(fullText)

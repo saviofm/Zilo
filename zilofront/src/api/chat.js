@@ -1,9 +1,10 @@
 // POST /api/chat — streaming SSE
-export async function sendChat({ conversationId, message, orchestrationId, onDelta, onDone }) {
+// attachments: array of processed file objects from api/files.js
+export async function sendChat({ conversationId, message, orchestrationId, attachments = [], onDelta, onDone }) {
   const res = await fetch('/api/chat', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ conversationId, message, orchestrationId, stream: true }),
+    body: JSON.stringify({ conversationId, message, orchestrationId, attachments, stream: true }),
   })
 
   if (!res.ok) {

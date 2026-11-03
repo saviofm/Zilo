@@ -41,7 +41,7 @@ cds.on('served', () => {
     log.info({ uid }, 'chat auth');
     if (!uid) return res.status(401).json({ error: 'Unauthenticated' });
 
-    const { conversationId, message, orchestrationId, stream = true } = req.body ?? {};
+    const { conversationId, message, orchestrationId, attachments = [], stream = true } = req.body ?? {};
     if (!conversationId || !message?.trim()) {
       return res.status(400).json({ error: 'conversationId and message are required' });
     }
@@ -82,10 +82,25 @@ cds.on('served', () => {
 
       // ── 4. Load chat history ──────────────────────────────────────────────────
       const history = await SELECT.from(Messages).where({ conversation_id: conversationId }).orderBy('seq asc');
-      // Include current user message at the end — it hasn't been persisted yet
+
+      // Build current user message content — plain text or multimodal array with attachments
+      const currentContent = attachments.length > 0
+        ? [
+            { type: 'text', text: message || 'Analise os arquivos anexados.' },
+            ...attachments.map(a => {
+              if (a.type === 'image') {
+                // image_url with base64 data URL
+                return { type: 'image_url', image_url: { url: a.dataUrl, detail: 'auto' } };
+              }
+              // Text content from document (PDF, Word, Excel, etc.)
+              return { type: 'text', text: `[Arquivo: ${a.name}]\n${a.text}` };
+            }),
+          ]
+        : message;
+
       const messages = [
         ...history.map(m => ({ role: m.role, content: _extractText(m.content) })),
-        { role: 'user', content: message },
+        { role: 'user', content: currentContent },
       ];
 
       // ── 5. Create orchestration client ────────────────────────────────────────
