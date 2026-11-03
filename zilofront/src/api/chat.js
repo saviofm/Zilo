@@ -1,7 +1,6 @@
 // POST /api/chat — streaming SSE
-// attachments: array of processed file objects from api/files.js
-// onAttachment: called when server detects a downloadable block { format, data, filename }
-export async function sendChat({ conversationId, message, orchestrationId, attachments = [], onDelta, onDone, onAttachment }) {
+// Handles: delta, step, block, attachment, done
+export async function sendChat({ conversationId, message, orchestrationId, attachments = [], onDelta, onStep, onBlock, onAttachment, onDone }) {
   const res = await fetch('/api/chat', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -30,10 +29,12 @@ export async function sendChat({ conversationId, message, orchestrationId, attac
       const raw = line.slice(6).trim()
       try {
         const parsed = JSON.parse(raw)
-        if (parsed.type === 'delta' && parsed.text) onDelta(parsed.text)
+        if (parsed.type === 'delta')      onDelta?.(parsed.text)
+        if (parsed.type === 'step')       onStep?.(parsed.label)
+        if (parsed.type === 'block')      onBlock?.(parsed)
         if (parsed.type === 'attachment') onAttachment?.(parsed)
-        if (parsed.type === 'chart') onAttachment?.({ ...parsed, isChart: true })
-        if (parsed.type === 'done') onDone(parsed)
+        if (parsed.type === 'chart')      onBlock?.({ kind: 'chart', data: parsed.data })
+        if (parsed.type === 'done')       onDone?.(parsed)
       } catch { /* SSE comment */ }
     }
   }

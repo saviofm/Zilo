@@ -11,7 +11,7 @@
 
 import cds from '@sap/cds';
 import express from 'express';
-import { createOrchestrationClient } from './providers/aicore-orchestration.js';
+import { createOrchestrationClient, TOOL_LABELS } from './providers/aicore-orchestration.js';
 import { createLogger } from './utils/logger.js';
 
 const log = createLogger('server');
@@ -127,12 +127,7 @@ cds.on('served', () => {
         createdAt: new Date().toISOString(),
       });
 
-      // ── 7. Call AI Core ───────────────────────────────────────────────────────
-      // The provider may downgrade to non-streaming if the model doesn't support it.
-      // We detect this by checking whether the result has { stream } or { data }.
-      const result = await client.complete({ messages, stream });
-      log.info({ hasStreamResp: !!result.streamResp, hasData: !!result.data }, 'chat result type');
-
+      // ── 7. Start SSE response ─────────────────────────────────────────────────
       if (stream) {
         res.setHeader('Content-Type', 'text/event-stream');
         res.setHeader('Cache-Control', 'no-cache');
@@ -140,92 +135,140 @@ cds.on('served', () => {
         res.flushHeaders();
       }
 
-      let fullText = '', usageData = null;
+      const heartbeat = stream ? setInterval(() => res.write(': keep-alive\n\n'), 15_000) : null;
 
-      if (result.streamResp) {
-        // Streaming path — result.streamResp is OrchestrationStreamResponse
-        // result.streamResp.stream is the async iterable of OrchestrationStreamChunkResponse
-        const heartbeat = setInterval(() => res.write(': keep-alive\n\n'), 15_000);
-        try {
-          for await (const chunk of result.streamResp.stream) {
-            const delta = chunk.getDeltaContent?.() ?? null;
-            if (delta) {
-              fullText += delta;
-              res.write(`data: ${JSON.stringify({ type: 'delta', text: delta })}\n\n`);
-            }
-          }
-          usageData = result.streamResp.getTokenUsage?.() ?? result.streamResp.getUsage?.() ?? null;
-          log.info({ usageData }, 'chat streaming usage');
-          // Extract tool_calls from stream after completion
-          const streamToolCalls = result.streamResp.getToolCalls?.() ?? null;
-          if (streamToolCalls?.length) {
-            for (const tc of streamToolCalls) {
-              if (tc.function?.name === 'render_chart') {
-                try {
-                  const chartData = typeof tc.function.arguments === 'string'
-                    ? JSON.parse(tc.function.arguments) : tc.function.arguments;
-                  res.write(`data: ${JSON.stringify({ type: 'chart', data: chartData })}\n\n`);
-                } catch { /* ignore */ }
+      // ── 8. Tool-use loop (max 10 iterations) ─────────────────────────────────
+      // Each iteration may return tool_calls — we process them, emit SSE blocks,
+      // and call AI Core again with tool_results until stop or max iterations.
+      // Usage is accumulated across all iterations (Ledger option C).
+      const MAX_TOOL_ITERATIONS = 10;
+      let fullText = '';
+      let totalInputTokens = 0;
+      let totalOutputTokens = 0;
+      let totalCachedTokens = 0;
+      const pendingBlocks = []; // blocks collected from tool_calls
+      const conversationMessages = [...messages]; // grows with tool turns
+
+      try {
+        for (let iteration = 0; iteration < MAX_TOOL_ITERATIONS; iteration++) {
+          const iterClient = await createOrchestrationClient(orch);
+          const iterMessages = iteration === 0 ? messages : conversationMessages;
+          const result = await iterClient.complete({ messages: iterMessages, stream: iteration === 0 ? stream : false });
+
+          log.info({ iteration, hasStreamResp: !!result.streamResp, hasData: !!result.data }, 'tool loop iteration');
+
+          let iterText = '';
+          let iterToolCalls = null;
+
+          if (result.streamResp) {
+            // Streaming (first iteration only)
+            for await (const chunk of result.streamResp.stream) {
+              const delta = chunk.getDeltaContent?.() ?? null;
+              if (delta) {
+                iterText += delta;
+                res.write(`data: ${JSON.stringify({ type: 'delta', text: delta })}\n\n`);
               }
             }
-          }
-        } finally {
-          clearInterval(heartbeat);
-        }
-      } else {
-        // Non-streaming path (including forced fallback)
-        const resp = result.data;
-        fullText = resp.getContent?.() ?? resp.choices?.[0]?.message?.content ?? '';
-        usageData = resp.getUsage?.() ?? resp.usage ?? null;
-        log.info({ usageData, fullTextLen: fullText?.length }, 'chat usage');
-
-        if (stream) {
-          // Client expected SSE — send the full text as a single delta
-          res.write(`data: ${JSON.stringify({ type: 'delta', text: fullText })}\n\n`);
-        }
-      }
-
-      // ── 8. Detect charts, downloadable blocks, Markdown tables ──────────────
-      if (stream) {
-        // a) tool_calls from non-streaming response (SDK method)
-        const toolCalls = result.data?.getToolCalls?.() ?? null;
-        if (toolCalls) {
-          for (const tc of toolCalls) {
-            if (tc.function?.name === 'render_chart') {
-              try {
-                const chartData = typeof tc.function.arguments === 'string'
-                  ? JSON.parse(tc.function.arguments) : tc.function.arguments;
-                res.write(`data: ${JSON.stringify({ type: 'chart', data: chartData })}\n\n`);
-              } catch { /* ignore malformed */ }
+            const usage = result.streamResp.getTokenUsage?.() ?? null;
+            if (usage) {
+              totalInputTokens  += usage.prompt_tokens ?? 0;
+              totalOutputTokens += usage.completion_tokens ?? 0;
+              totalCachedTokens += usage.prompt_tokens_details?.cached_tokens ?? 0;
+            }
+            iterToolCalls = result.streamResp.getToolCalls?.() ?? null;
+          } else {
+            const resp = result.data;
+            iterText = resp.getContent?.() ?? '';
+            const usage = resp.getTokenUsage?.() ?? resp.getUsage?.() ?? null;
+            if (usage) {
+              totalInputTokens  += usage.prompt_tokens ?? 0;
+              totalOutputTokens += usage.completion_tokens ?? 0;
+              totalCachedTokens += usage.prompt_tokens_details?.cached_tokens ?? 0;
+            }
+            iterToolCalls = resp.getToolCalls?.() ?? null;
+            if (iterText && stream) {
+              res.write(`data: ${JSON.stringify({ type: 'delta', text: iterText })}\n\n`);
             }
           }
+
+          if (iterText) fullText += iterText;
+
+          // No tool_calls → model is done
+          if (!iterToolCalls?.length) break;
+
+          // Process tool_calls — emit step + block, build tool_results for next turn
+          const toolResults = [];
+          for (const tc of iterToolCalls) {
+            const name = tc.function?.name ?? '';
+            let args = {};
+            try { args = typeof tc.function.arguments === 'string' ? JSON.parse(tc.function.arguments) : (tc.function.arguments ?? {}); } catch { /* ignore */ }
+
+            // Emit processing step label
+            const label = TOOL_LABELS[name]?.(args) ?? `Executando ${name}...`;
+            if (stream) res.write(`data: ${JSON.stringify({ type: 'step', label })}\n\n`);
+
+            // Emit block for render tools
+            const blockKind = {
+              render_chart:  'chart',
+              render_table:  'table',
+              render_kpi:    'kpi',
+              calculator:    'calculator',
+              generate_file: 'attachment',
+              render_code:   'code',
+            }[name];
+
+            if (blockKind) {
+              if (blockKind === 'attachment') {
+                const evt = { type: 'attachment', format: args.format ?? 'csv', filename: `${args.filename ?? 'dados'}.${args.format ?? 'csv'}`, data: args.data ?? '' };
+                if (stream) res.write(`data: ${JSON.stringify(evt)}\n\n`);
+                pendingBlocks.push(evt);
+              } else {
+                const evt = { type: 'block', kind: blockKind, data: args };
+                if (stream) res.write(`data: ${JSON.stringify(evt)}\n\n`);
+                pendingBlocks.push(evt);
+              }
+            }
+
+            toolResults.push({
+              role: 'tool',
+              tool_call_id: tc.id,
+              content: JSON.stringify({ ok: true, rendered: !!blockKind }),
+            });
+          }
+
+          // Add assistant message (with tool_calls) + tool results to history
+          // so next iteration has full context
+          conversationMessages.push({ role: 'assistant', content: iterText || null, tool_calls: iterToolCalls });
+          conversationMessages.push(...toolResults);
         }
 
-        // b) code blocks: ```csv, ```json, ```xlsx
-        if (fullText) {
+        // Emit any text-based blocks from final response
+        if (fullText && stream) {
+          // CSV/JSON code blocks
           const blockRe = /```(csv|json|xlsx|tsv)(:[^\n]*)?\n([\s\S]*?)```/gi;
           let m;
           while ((m = blockRe.exec(fullText)) !== null) {
             const format   = m[1].toLowerCase();
-            const filename = m[2] ? m[2].slice(1).trim() : `dados.${format === 'xlsx' ? 'xlsx' : format}`;
+            const filename = m[2] ? m[2].slice(1).trim() : `dados.${format}`;
             const data     = m[3].trim();
             if (data) res.write(`data: ${JSON.stringify({ type: 'attachment', format, filename, data })}\n\n`);
           }
-
-          // c) Markdown tables — convert to CSV and emit as attachment
+          // Markdown tables
           const tableRe = /(\|.+\|\n\|[-: |]+\|\n(?:\|.+\|\n?)+)/g;
-          let tm; let tableIdx = 0;
+          let tm; let tIdx = 0;
           while ((tm = tableRe.exec(fullText)) !== null) {
             const rows = tm[1].trim().split('\n')
               .filter(r => !r.match(/^\|[-: |]+\|$/))
               .map(r => r.split('|').slice(1,-1).map(c => c.trim()).join(','));
             if (rows.length > 1) {
-              const csv = rows.join('\n');
-              tableIdx++;
-              res.write(`data: ${JSON.stringify({ type: 'attachment', format: 'csv', filename: `tabela${tableIdx > 1 ? '_' + tableIdx : ''}.xlsx`, data: csv })}\n\n`);
+              tIdx++;
+              res.write(`data: ${JSON.stringify({ type: 'attachment', format: 'csv', filename: `tabela${tIdx > 1 ? '_'+tIdx : ''}.xlsx`, data: rows.join('\n') })}\n\n`);
             }
           }
         }
+
+      } finally {
+        if (heartbeat) clearInterval(heartbeat);
       }
 
       // ── 9. Persist + close ────────────────────────────────────────────────────
@@ -237,7 +280,12 @@ cds.on('served', () => {
         content: JSON.stringify([{ type: 'text', text: fullText }]),
         createdAt: new Date().toISOString(), ledgerEntry_id: ledgerId,
       });
-      const ledgerEntry = _buildLedgerEntry(ledgerId, uid, conversationId, assistantMsgId, orch, model, usageData, budgetCU);
+
+      // Ledger option C: one entry with accumulated tokens across all loop iterations
+      const accumulatedUsage = totalInputTokens > 0
+        ? { prompt_tokens: totalInputTokens, completion_tokens: totalOutputTokens, prompt_tokens_details: { cached_tokens: totalCachedTokens } }
+        : null;
+      const ledgerEntry = _buildLedgerEntry(ledgerId, uid, conversationId, assistantMsgId, orch, model, accumulatedUsage, budgetCU);
       if (ledgerEntry) await INSERT.into(TokenLedger).entries(ledgerEntry);
       await UPDATE(Conversations, conversationId).with({ updatedAt: new Date().toISOString() });
 

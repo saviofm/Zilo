@@ -6,8 +6,9 @@ import ConversationList from './components/ConversationList'
 import Markdown from './components/Markdown'
 import ConsumptionRoute from './routes/ConsumptionRoute'
 import SessionExpiredScreen from './components/SessionExpiredScreen'
-import { downloadAsExcel, downloadAsCSV, downloadAsJSON } from './api/files.js'
-import ChartBlock from './components/ChartBlock'
+import ProcessingCard from './components/ProcessingCard'
+import BlockDispatcher from './components/BlockDispatcher'
+import { downloadAsExcel, downloadAsJSON } from './api/files.js'
 import { sendChat } from './api/chat'
 import { fetchUser } from './api/user'
 import { fetchMyOrchestrations, fetchBudgetStatus } from './api/orchestrations'
@@ -52,29 +53,7 @@ function AttachmentChip({ attachment }) {
   )
 }
 
-function DownloadChip({ att }) {
-  function handleDownload() {
-    if (att.format === 'json') downloadAsJSON(att.data, att.filename)
-    else if (att.format === 'csv' || att.format === 'tsv') downloadAsExcel(att.data, att.filename.replace(/\.(csv|tsv)$/, '.xlsx'))
-    else downloadAsExcel(att.data, att.filename)
-  }
-  const icons = { csv: '📊', json: '📋', xlsx: '📊', tsv: '📊' }
-  return (
-    <button onClick={handleDownload} style={{
-      display: 'inline-flex', alignItems: 'center', gap: 6,
-      background: 'var(--accent-light)', border: '1px solid var(--accent)',
-      borderRadius: 8, padding: '5px 12px', cursor: 'pointer',
-      fontSize: 12, fontWeight: 600, color: 'var(--joule)',
-      fontFamily: 'inherit', transition: 'background 0.12s',
-    }}
-      onMouseEnter={e => e.currentTarget.style.background = '#d4edb8'}
-      onMouseLeave={e => e.currentTarget.style.background = 'var(--accent-light)'}
-    >
-      <span>{icons[att.format] ?? '📄'}</span>
-      Baixar {att.filename}
-    </button>
-  )
-}
+// DownloadChip moved to components/DownloadChip.jsx
 
 function UserMessage({ content, attachments = [] }) {
   return (
@@ -153,6 +132,7 @@ export default function App() {
   const [activeConvId, setActiveConvId] = useState(null)
   const [streamingText, setStreamingText] = useState('')
   const [isStreaming, setIsStreaming] = useState(false)
+  const [processingSteps, setProcessingSteps] = useState([])  // tool-use step labels
   const [currentUser, setCurrentUser] = useState(null)
   const [orchestrations, setOrchestrations] = useState([])
   const [selectedOrchId, setSelectedOrchId] = useState(null)
@@ -257,9 +237,10 @@ export default function App() {
 
     setIsStreaming(true)
     setStreamingText('')
+    setProcessingSteps([])
 
     let fullText = ''
-    const downloadAtts = []
+    const blocks = []  // tool-use blocks (chart, table, kpi, etc.)
     try {
       await sendChat({
         conversationId: convId,
@@ -270,16 +251,23 @@ export default function App() {
           fullText += chunk
           setStreamingText(fullText)
         },
-        onAttachment: (att) => { downloadAtts.push(att) },
+        onStep: (label) => {
+          setProcessingSteps(prev => [...prev, label])
+        },
+        onBlock: (block) => {
+          blocks.push(block)
+        },
+        onAttachment: (att) => {
+          blocks.push({ kind: 'attachment', data: att })
+        },
         onDone: () => {},
       })
 
-      const assistantMsg = { role: 'assistant', content: fullText, downloads: downloadAtts }
+      const assistantMsg = { role: 'assistant', content: fullText, blocks }
       patchConv(convId, {
         messages: [...(conversations.find(c => c.id === convId)?.messages ?? []), userMsg, assistantMsg],
         processing: false,
       })
-      // Backend (server.js) already persists both messages — no appendMessage needed here.
     } catch (err) {
       patchConv(convId, {
         messages: [...(conversations.find(c => c.id === convId)?.messages ?? []), userMsg,
@@ -289,6 +277,7 @@ export default function App() {
     } finally {
       setIsStreaming(false)
       setStreamingText('')
+      setProcessingSteps([])
       fetchBudgetStatus().then(setBudgetStatus).catch(() => {})
       setConsumptionRefresh(r => r + 1)
     }
@@ -364,26 +353,18 @@ export default function App() {
                 ? <UserMessage key={i} content={msg.content} attachments={msg.attachments} />
                 : <div key={i} ref={isLastAssistant ? lastAssistantRef : null}>
                     <AssistantMessage content={msg.content} streaming={false} />
-                    {msg.downloads?.length > 0 && (
-                      <div style={{ marginLeft: 40, marginBottom: 8 }}>
-                        {/* Charts */}
-                        {msg.downloads.filter(d => d.isChart).map((d, j) => (
-                          <ChartBlock key={`chart-${j}`} data={d.data} />
-                        ))}
-                        {/* Download chips */}
-                        {msg.downloads.filter(d => !d.isChart).length > 0 && (
-                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 8 }}>
-                            {msg.downloads.filter(d => !d.isChart).map((att, j) => (
-                              <DownloadChip key={`dl-${j}`} att={att} />
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    )}
+                    {msg.blocks?.length > 0 && <BlockDispatcher blocks={msg.blocks} />}
                   </div>
             })}
 
-            {isStreaming && !streamingText && <ThinkingMessage />}
+            {/* ProcessingCard: shown during tool-use loop */}
+            {isStreaming && processingSteps.length > 0 && (
+              <div style={{ marginLeft: 40 }}>
+                <ProcessingCard steps={processingSteps} streaming={isStreaming} />
+              </div>
+            )}
+
+            {isStreaming && !streamingText && processingSteps.length === 0 && <ThinkingMessage />}
             {isStreaming && streamingText && (
               <AssistantMessage content={streamingText} streaming={true} />
             )}
