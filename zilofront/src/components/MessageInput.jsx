@@ -64,7 +64,7 @@ function OrchSelector({ orchestrations, selectedOrchId, conversationOrchId, onOr
             maxHeight: '60vh', overflowY: 'auto',
           }}>
             <div style={{ padding: '8px 12px 4px', fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em', position: 'sticky', top: 0, background: '#fff', borderBottom: '1px solid var(--border)', zIndex: 1 }}>
-              Persona de IA
+              Perfil de IA
             </div>
             {orchestrations.map(orch => (
               <button key={orch.id} onClick={() => { onOrchChange(orch.id); setOpen(false) }}

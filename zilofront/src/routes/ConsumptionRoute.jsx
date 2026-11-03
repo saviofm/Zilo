@@ -100,7 +100,7 @@ function DetailModal({ entries, onClose }) {
         <div style={{ padding:'12px 24px', borderBottom:'1px solid var(--border)', display:'flex', gap:12, flexShrink:0, flexWrap:'wrap' }}>
           <select value={filterOrch} onChange={e => setFilterOrch(e.target.value)}
             style={{ padding:'6px 10px', borderRadius:8, border:'1px solid var(--border)', fontSize:13, background:'#fff', fontFamily:'inherit', color:'var(--text-primary)', cursor:'pointer' }}>
-            <option value="">Todas as personas</option>
+            <option value="">Todos os perfis</option>
             {orchNames.map(n => <option key={n} value={n}>{n}</option>)}
           </select>
           <select value={sortBy} onChange={e => setSortBy(e.target.value)}
@@ -114,7 +114,7 @@ function DetailModal({ entries, onClose }) {
           <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13 }}>
             <thead style={{ position:'sticky', top:0, background:'#f8f9fa', zIndex:1 }}>
               <tr>
-                {['Data/Hora','Persona','Tokens entrada','Tokens saída','Créditos de IA'].map(h => (
+                {['Data/Hora','Perfil de IA','Tokens entrada','Tokens saída','Créditos de IA'].map(h => (
                   <th key={h} style={{ padding:'10px 16px', textAlign:h.includes('Token')||h.includes('Crédito')?'right':'left', fontWeight:600, color:'var(--text-muted)', fontSize:11, textTransform:'uppercase', letterSpacing:'0.04em', whiteSpace:'nowrap', borderBottom:'2px solid var(--border)' }}>{h}</th>
                 ))}
               </tr>
@@ -209,8 +209,8 @@ export default function ConsumptionRoute({ refreshTrigger=0 }) {
 
             {byOrch.length>0 && (
               <div style={{ background:'#fff', border:'1px solid var(--border)', borderRadius:12, padding:'20px 24px', marginBottom:20, boxShadow:'var(--shadow-card)' }}>
-                <h3 style={{ fontSize:14, fontWeight:700, color:'var(--text-primary)', marginBottom:16 }}>Por persona</h3>
-                {byOrch.map((o,i) => <PersonaBar key={o.orchestrationId??i} name={o.orchestrationName??o.orchestrationId??`Persona ${i+1}`} credits={o.totalCU??0} calls={o.totalCalls??0} maxCredits={maxOrch} />)}
+                <h3 style={{ fontSize:14, fontWeight:700, color:'var(--text-primary)', marginBottom:16 }}>Por perfil de IA</h3>
+                {byOrch.map((o,i) => <PersonaBar key={o.orchestrationId??i} name={o.orchestrationName??o.orchestrationId??`Perfil ${i+1}`} credits={o.totalCU??0} calls={o.totalCalls??0} maxCredits={maxOrch} />)}
               </div>
             )}
 
@@ -228,7 +228,7 @@ export default function ConsumptionRoute({ refreshTrigger=0 }) {
                   <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13 }}>
                     <thead>
                       <tr style={{ background:'#f8f9fa' }}>
-                        {['Data/Hora','Persona','Tokens','Créditos de IA'].map(h => (
+                        {['Data/Hora','Perfil de IA','Tokens','Créditos de IA'].map(h => (
                           <th key={h} style={{ padding:'10px 16px', textAlign:h==='Tokens'||h==='Créditos de IA'?'right':'left', fontWeight:600, color:'var(--text-muted)', fontSize:11, textTransform:'uppercase', letterSpacing:'0.04em', whiteSpace:'nowrap', borderBottom:'1px solid var(--border)' }}>{h}</th>
                         ))}
                       </tr>
