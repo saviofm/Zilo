@@ -69,15 +69,22 @@ export default class AdminService extends cds.ApplicationService {
 
     this.on('usageByMonth', async req => {
       const months = Math.min(Number(req.data.months ?? 12), 24);
-      const rows = await SELECT.from(TokenLedger)
-        .columns(`SUBSTRING(timestamp, 1, 7) as yearMonth`, 'SUM(totalCU) as totalCU', 'COUNT(*) as totalCalls')
-        .groupBy(`SUBSTRING(timestamp, 1, 7)`)
-        .orderBy(`yearMonth desc`)
-        .limit(months);
+      // CAP CQL parser doesn't support SUBSTRING in .orderBy() — use raw SQL
+      // HANA table name: namespace 'zilo' + entity 'TokenLedger' = ZILO_TOKENLEDGER
+      const tableName = TokenLedger['@cds.persistence.name'] ?? 'ZILO_TOKENLEDGER';
+      const rows = await cds.db.run(
+        `SELECT SUBSTRING(TIMESTAMP, 1, 7) AS YEARMONTH,
+                SUM(TOTALCU)              AS TOTALCU,
+                COUNT(*)                  AS TOTALCALLS
+         FROM "${tableName}"
+         GROUP BY SUBSTRING(TIMESTAMP, 1, 7)
+         ORDER BY SUBSTRING(TIMESTAMP, 1, 7) DESC
+         LIMIT ${months}`
+      );
       return rows.map(r => ({
-        yearMonth:  r.yearMonth,
-        totalCU:    Number(r.totalCU ?? 0),
-        totalCalls: Number(r.totalCalls ?? 0),
+        yearMonth:  r.YEARMONTH  ?? r.yearMonth,
+        totalCU:    Number(r.TOTALCU    ?? r.totalCU    ?? 0),
+        totalCalls: Number(r.TOTALCALLS ?? r.totalCalls ?? 0),
       })).reverse();
     });
 

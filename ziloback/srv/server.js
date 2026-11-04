@@ -238,7 +238,7 @@ cds.on('served', () => {
 
           // Add assistant message (with tool_calls) + tool results to history
           // so next iteration has full context
-          conversationMessages.push({ role: 'assistant', content: iterText || null, tool_calls: iterToolCalls });
+          conversationMessages.push({ role: 'assistant', content: iterText || '', tool_calls: iterToolCalls });
           conversationMessages.push(...toolResults);
         }
 
@@ -274,10 +274,19 @@ cds.on('served', () => {
       // ── 9. Persist + close ────────────────────────────────────────────────────
       const assistantMsgId = cds.utils.uuid();
       const ledgerId = cds.utils.uuid();
+      // Persist text + any tool blocks/attachments so they survive page reload
+      const assistantContent = [
+        ...(fullText ? [{ type: 'text', text: fullText }] : []),
+        ...pendingBlocks.map(b =>
+          b.type === 'attachment'
+            ? { type: 'attachment', format: b.format, filename: b.filename, data: b.data }
+            : { type: 'block', kind: b.kind, data: b.data }
+        ),
+      ];
       await INSERT.into(Messages).entries({
         id: assistantMsgId, conversation_id: conversationId,
         seq: nextSeq + 1, role: 'assistant',
-        content: JSON.stringify([{ type: 'text', text: fullText }]),
+        content: JSON.stringify(assistantContent.length ? assistantContent : [{ type: 'text', text: '' }]),
         createdAt: new Date().toISOString(), ledgerEntry_id: ledgerId,
       });
 

@@ -230,10 +230,11 @@ export default function App() {
       ...(a.type === 'image' ? { preview: a.dataUrl } : { text: a.text }),
     }))
     const userMsg = { role: 'user', content: text, attachments: attachmentsMeta }
-    patchConv(convId, {
-      messages: [...(conversations.find(c => c.id === convId)?.messages ?? []), userMsg],
-      processing: true,
-    })
+    // Use functional update to avoid stale closure on conversations state
+    setConversations(prev => prev.map(c => c.id === convId
+      ? { ...c, messages: [...c.messages, userMsg], processing: true }
+      : c
+    ))
 
     setIsStreaming(true)
     setStreamingText('')
@@ -264,16 +265,15 @@ export default function App() {
       })
 
       const assistantMsg = { role: 'assistant', content: fullText, blocks }
-      patchConv(convId, {
-        messages: [...(conversations.find(c => c.id === convId)?.messages ?? []), userMsg, assistantMsg],
-        processing: false,
-      })
+      setConversations(prev => prev.map(c => c.id === convId
+        ? { ...c, messages: [...c.messages, assistantMsg], processing: false }
+        : c
+      ))
     } catch (err) {
-      patchConv(convId, {
-        messages: [...(conversations.find(c => c.id === convId)?.messages ?? []), userMsg,
-          { role: 'assistant', content: `⚠️ ${err.message}` }],
-        processing: false,
-      })
+      setConversations(prev => prev.map(c => c.id === convId
+        ? { ...c, messages: [...c.messages, { role: 'assistant', content: `⚠️ ${err.message}` }], processing: false }
+        : c
+      ))
     } finally {
       setIsStreaming(false)
       setStreamingText('')
@@ -293,10 +293,18 @@ export default function App() {
       const data = await loadConversation(id)
       const rawMsgs = Array.isArray(data.messages) ? data.messages : data.messages?.value ?? []
       const msgs = rawMsgs.map(m => {
-        let blocks
-        try { blocks = JSON.parse(m.content) } catch { blocks = [{ type: 'text', text: m.content }] }
-        const text = Array.isArray(blocks) ? blocks.filter(b => b.type === 'text').map(b => b.text).join('\n') : m.content
-        return { role: m.role, content: text }
+        let parsed
+        try { parsed = JSON.parse(m.content) } catch { parsed = [{ type: 'text', text: m.content }] }
+        const items = Array.isArray(parsed) ? parsed : [{ type: 'text', text: m.content }]
+        const text = items.filter(b => b.type === 'text').map(b => b.text).join('\n')
+        // restore tool blocks (charts, tables, KPIs) and attachments
+        const richBlocks = items
+          .filter(b => b.type === 'block' || b.type === 'attachment')
+          .map(b => b.type === 'attachment'
+            ? { kind: 'attachment', data: { format: b.format, filename: b.filename, data: b.data } }
+            : { type: 'block', kind: b.kind, data: b.data }
+          )
+        return { role: m.role, content: text, blocks: richBlocks.length > 0 ? richBlocks : undefined }
       })
       patchConv(id, { messages: msgs, loaded: true })
     } catch { patchConv(id, { loaded: true }) }

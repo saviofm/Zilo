@@ -1,0 +1,25 @@
+Analise integralmente o arquivo Excel anexado, que contém dados corporativos fictícios de operações comerciais.
+
+Sua missão é produzir uma análise executiva utilizando os dados disponíveis, sem inventar informações.
+
+Execute as seguintes atividades:
+
+Preparação dos dados: leia todas as abas, padronize nomes de produtos, relacione clientes e pedidos, identifique registros duplicados e possíveis inconsistências de faturamento.
+
+Análise financeira: calcule o faturamento líquido, a margem bruta por produto, a evolução mensal e o desempenho de cada região em relação às metas.
+
+Análise de recebíveis: cruze as faturas com os pagamentos, identifique títulos vencidos e calcule o saldo devedor de cada cliente.
+
+Análise operacional: identifique pedidos entregues em atraso e calcule o percentual de entregas dentro do prazo.
+
+Análise semântica com IA: leia os comentários das ocorrências, classifique os problemas por categoria, identifique reclamações críticas e explique seus potenciais impactos comerciais.
+
+Identificação de riscos: selecione os cinco clientes que merecem maior atenção, considerando inadimplência, atrasos logísticos e ocorrências críticas.
+
+Recomendações: proponha um plano de ação com responsáveis sugeridos, prioridades e justificativas.
+
+Entrega: gere um novo arquivo Excel contendo os dados tratados, os indicadores calculados, um resumo executivo e um plano de ação.
+
+Apresente também um resumo gerencial com os cinco principais insights, informando de quais abas e registros foram extraídas as evidências.
+
+Utilize 03/11/2026 como data de referência para os cálculos. Informe eventuais limitações e inconsistências encontradas.

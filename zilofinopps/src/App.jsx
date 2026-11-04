@@ -1,5 +1,7 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import Sidebar from './components/Sidebar'
+import SessionExpiredScreen from './components/SessionExpiredScreen'
+import SessionTimeoutModal  from './components/SessionTimeoutModal'
 import InsightsPanel from './components/InsightsPanel'
 import OverviewRoute   from './routes/OverviewRoute'
 import ByMonthRoute    from './routes/ByMonthRoute'
@@ -7,12 +9,20 @@ import ByModelRoute    from './routes/ByModelRoute'
 import ByPersonaRoute  from './routes/ByPersonaRoute'
 import ByJobRoleRoute  from './routes/ByJobRoleRoute'
 import DrilldownRoute  from './routes/DrilldownRoute'
-import SimulatorRoute  from './routes/SimulatorRoute'
+import SimulatorRoute         from './routes/SimulatorRoute'
+import SimuladorAvancadoRoute from './routes/SimuladorAvancadoRoute'
 
 export default function App() {
   const [active, setActive]           = useState('overview')
   const [insightsOpen, setInsightsOpen] = useState(false)
   const [insightsCtx, setInsightsCtx] = useState(null)
+  const [sessionExpired, setSessionExpired] = useState(false)
+
+  useEffect(() => {
+    const handler = () => setSessionExpired(true)
+    window.addEventListener('session-expired', handler)
+    return () => window.removeEventListener('session-expired', handler)
+  }, [])
 
   const handleInsightsContext = useCallback(({ label, data }) => {
     setInsightsCtx({ label, data })
@@ -27,7 +37,8 @@ export default function App() {
     byPersona:  <ByPersonaRoute {...routeProps} />,
     byJobRole:  <ByJobRoleRoute {...routeProps} />,
     drilldown:  <DrilldownRoute {...routeProps} />,
-    simulator:  <SimulatorRoute />,
+    simulator:          <SimulatorRoute />,
+    simuladorAvancado:  <SimuladorAvancadoRoute />,
   }
 
   return (
@@ -58,6 +69,10 @@ export default function App() {
       >
         {insightsOpen ? '×' : '💡'}
       </button>
+
+      {/* Session */}
+      <SessionTimeoutModal />
+      {sessionExpired && <SessionExpiredScreen />}
 
       {/* Insights panel */}
       <InsightsPanel

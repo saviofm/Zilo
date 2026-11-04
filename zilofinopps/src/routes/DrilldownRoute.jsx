@@ -153,18 +153,14 @@ export default function DrilldownRoute({ onInsightsContext }) {
   const atRisk     = data.filter(u => Number(u.percentUsed ?? 0) >= 80).length
 
   useEffect(() => {
-    onInsightsContext?.({ label: 'Drill-down Usuários', data: { yearMonth: ym, totalUsers, atRisk, topUsers: data.slice(0, 10) } })
+    onInsightsContext?.({ label: 'Visão por Usuários', data: { yearMonth: ym, totalUsers, atRisk, topUsers: data.slice(0, 10) } })
   }, [totalUsers]) // eslint-disable-line
 
   return (
     <div style={{ flex: 1, overflowY: 'auto', background: 'var(--bg-shell)' }}>
-      <PageHeader title="Drill-down por Usuário" controls={<MonthNav value={ym} onChange={setYm} />} />
+      <PageHeader title="Visão por Usuários" controls={<MonthNav value={ym} onChange={setYm} />} />
 
       <div style={{ padding: '24px 32px' }}>
-        <div style={{ background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 10, padding: '10px 16px', marginBottom: 20, fontSize: 12, color: '#92400e' }}>
-          ⚠️ <strong>Roadmap:</strong> autenticação e controle de acesso por role (ZiloAdmin) pendente de implementação. Atualmente sem restrição.
-        </div>
-
         {loading ? <Spinner /> : (
           <>
             <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginBottom: 24 }}>
@@ -190,7 +186,7 @@ export default function DrilldownRoute({ onInsightsContext }) {
             {/* Table */}
             <div className="card" style={{ overflow: 'hidden' }}>
               <div style={{ padding: '12px 20px', borderBottom: '1px solid var(--border)', fontSize: 12, color: 'var(--text-muted)' }}>
-                {filtered.length} usuários {search ? `(filtrado de ${data.length})` : ''} — clique em um usuário para ver o drill-down completo
+                {filtered.length} usuários {search ? `(filtrado de ${data.length})` : ''} — clique em um usuário para ver o detalhamento completo
               </div>
               {filtered.length === 0 ? <Empty /> : (
                 <div style={{ overflowX: 'auto' }}>

@@ -24,7 +24,9 @@ Zilo/
 ├── zilofinopps/       # Frontend FinOps Analytics React + Vite (admin dashboard)
 │   └── src/
 │       ├── components/  # ChartCard, KpiCard, InsightsPanel, Sidebar
-│       └── routes/      # Overview, ByMonth, ByModel, ByPersona, ByJobRole, Drilldown, Simulator
+│       └── routes/      # Overview, ByMonth, ByModel, ByPersona, ByJobRole,
+│                        # Visão por Usuários, Simulador, Simulador Avançado
+├── ZILODOCPARSER_PLAN.md  # Plano do app de parse de documentos para SDM
 └── usecase/           # Casos de uso para testes
     ├── basic/         # Pedidos_simples.xlsx + prompt.txt
     └── advanced/      # Faturamento Zilo.xlsx + prompt_advanced.txt
@@ -39,7 +41,7 @@ zilofront (React — chat)          zilofinopps (React — admin analytics)
     │  SSE + tool-use loop              │  REST → /api/admin
     ▼                                   ▼
 ziloback (CAP Node.js + Express)
-    │  config_ref + overrideConfig(tools)
+    │  config_ref + overrideConfig(tools) + fallback moduleConfigJson
     ▼
 SAP AI Core Orchestration (deployment d7a09bc4d6d523f7)
     ├── LLM (GPT-5.6 Luna/Sol, Gemini 3.5 Flash, Claude Sonnet 4.6, Sonar Pro)
@@ -82,15 +84,16 @@ SAP AI Core Orchestration (deployment d7a09bc4d6d523f7)
 | Perfil | Modelo | Grounding | Masking | Tools |
 |---|---|---|---|---|
 | Zilo Base | GPT-5.6 Luna | ❌ | ❌ | ✅ |
-| Zilo Base Docs | GPT-5.6 Luna | ✅ SDM | ❌ | ❌ |
-| Zilo Advanced Docs GPT | GPT-5.6 Sol | ✅ SDM | ✅ | ❌ |
-| Zilo Advanced Docs Gemini | Gemini 3.5 Flash | ✅ SDM | ✅ | ❌ |
-| Zilo Executive Docs Claude | Claude Sonnet 4.6 | ✅ SDM | ✅ | ❌ |
-| Zilo Executive Docs Astra | GPT-5.6 Sol | ✅ SDM | ✅ | ❌ |
+| Zilo Base Docs | GPT-5.6 Luna | ✅ SDM | ❌ | ✅* |
+| Zilo Advanced Docs GPT | GPT-5.6 Sol | ✅ SDM | ✅ | ✅* |
+| Zilo Advanced Docs Gemini | Gemini 3.5 Flash | ✅ SDM | ✅ | ✅* |
+| Zilo Executive Docs Claude | Claude Sonnet 4.6 | ✅ SDM | ✅ | ✅* |
+| Zilo Executive Docs Astra | GPT-5.6 Sol | ✅ SDM | ✅ | ✅* |
 | Zilo Pesquisa Web | Sonar Pro | ❌ web nativo | ✅ | ❌ |
-| Zilo SAP Help | GPT-5.6 Luna | ✅ help.sap.com | ❌ | ✅ |
+| Zilo SAP Help | GPT-5.6 Luna | ✅ help.sap.com | ❌ | ✅* |
 
-> Tools disponíveis nos perfis não-grounding: `render_chart`, `render_table`, `render_kpi`, `calculator`, `generate_file`, `render_code`
+> \* Tools disponíveis via `moduleConfigJson` no banco. Para plena eficácia via `config_ref`, instrução deve estar também no template do AI Launchpad.
+> Tools: `render_chart`, `render_table`, `render_kpi`, `calculator`, `generate_file`, `render_code`
 
 ---
 
@@ -100,12 +103,13 @@ SAP AI Core Orchestration (deployment d7a09bc4d6d523f7)
 - Streaming SSE + fallback non-streaming automático
 - **Tool-use loop** (máx 10 iterações) com ProcessingCard animado
 - Blocks renderizados: gráficos (Recharts), tabelas sortable/filterable, KPI cards, calculadora, código com syntax highlight, download de arquivos
+- **Blocos persistidos no banco** — gráficos e tabelas reaparecem ao reabrir a conversa
 - Upload multimodal: PDF, Word, Excel, CSV, imagens (processamento client-side)
 - Contexto de arquivos persistido no histórico da conversa
 - Drag & drop, múltiplos arquivos, chips de preview
 - Troca livre de perfil de IA por mensagem
 - Budget enforcement (402 quando limite atingido)
-- Session expiry screen com reload
+- Session expiry screen + timeout modal com countdown
 - Scroll inteligente + ThinkingMessage dots
 
 ### FinOps Analytics (zilofinopps)
@@ -114,8 +118,9 @@ SAP AI Core Orchestration (deployment d7a09bc4d6d523f7)
 - **Por Modelo**: distribuição de consumo por LLM com share %
 - **Por Perfil de IA**: ranking de personas mais usadas
 - **Por Cargo**: consumo agregado por JobRole/departamento
-- **Drilldown**: usuários individuais com ledger detalhado
-- **Simulador**: projeta custo mensal por cargo, modelo e volume de uso
+- **Visão por Usuários**: drill-down individual com ledger detalhado
+- **Simulador**: aba Por Volume (msgs/mês) e aba Por Cota (alocação orçamentária)
+- **Simulador Avançado**: por tokens, msgs/dia, comparação entre todos os perfis
 - **Agente de Insights**: chat com IA usando dados de consumo como contexto
 
 ### Consumo / Ledger
@@ -131,12 +136,12 @@ SAP AI Core Orchestration (deployment d7a09bc4d6d523f7)
 |---|---|
 | `ModelCatalog` | 59 modelos com preços em Créditos de IA/1k tokens |
 | `OrchestrationConfig` | 8 perfis (deploymentId + aicoreConfigId + moduleConfigJson + groundingEnabled) |
-| `CostPolicy` | Budget mensal (Integer Créditos de IA) + perfis permitidos |
+| `CostPolicy` | Budget mensal (Créditos de IA) + perfis permitidos |
 | `PolicyOrchestrations` | M:N entre CostPolicy e OrchestrationConfig |
 | `JobRole` | Cargo com departamento, diretoria e policy padrão |
 | `UserProfile` | Usuário (userId = XSUAA sub) vinculado ao JobRole |
 | `UserPolicyOverride` | Exceções temporárias por usuário |
-| `Conversations` + `Messages` | Histórico de chat (Messages inclui texto de arquivos) |
+| `Conversations` + `Messages` | Histórico de chat com texto e blocos tool-use persistidos |
 | `TokenLedger` | Log granular: tokens, llmCU, orchCU, totalCU |
 | `MonthlyUsageSummary` | Agregado mensal recomputado após cada chat |
 
@@ -146,11 +151,8 @@ SAP AI Core Orchestration (deployment d7a09bc4d6d523f7)
 
 ```bash
 # Ordem: ziloback primeiro (APIs), depois os frontends
-
 cd ziloback && mbt build && cf deploy mta_archives/ziloback_1.0.0.mtar
-
 cd zilofinopps && mbt build && cf deploy mta_archives/zilofinopps_1.0.0.mtar
-
 cd zilofront && mbt build && cf deploy mta_archives/zilofront_1.0.0.mtar
 ```
 
@@ -168,14 +170,24 @@ node scripts/seed-jobroles.mjs
 
 ## Roadmap
 
+### render_table nos perfis com grounding (próximo passo)
+- Adicionar instrução de tools no system prompt de cada perfil no AI Launchpad (5 perfis com grounding)
+- Atualizar `aicoreConfigId` no banco após salvar nova versão
+
+### zilodocparser — App de Parse de Documentos para SDM
+- App standalone no BTP para parse inteligente de documentos antes do upload no SDM
+- OCR via AI Core GPT Vision para PDFs escaneados e imagens
+- Suporte: PDF, Excel, Word, imagens → markdown estruturado
+- Preview antes do upload + escolha de pasta no SDM
+- Ver plano completo: `ZILODOCPARSER_PLAN.md`
+
 ### Armazenamento de Arquivos — SAP Object Store
-- Arquivo binário → SAP Object Store (S3-compatible) com TTL de 90 dias
-- Referência no banco em vez de conteúdo inline
-- Presigned URLs (1h), validação de ownership, limites por conversa
+- Binário dos arquivos → SAP Object Store (S3-compatible), TTL 90 dias
+- Chip do arquivo clicável ao reabrir conversa (hoje só texto extraído é persistido)
+- Nova entidade CAP: `Attachments`
 
 ### Streaming Real
-- Validar se `gpt-5.6-luna` passou a suportar streaming via orchestration deployment
-- Se necessário: trocar para `gpt-5.6-sol` no Zilo Base
+- Validar suporte streaming em `gpt-5.6-luna` via orchestration deployment
 
 ### Novos Perfis de IA
 - Perfil Agente (call_agent, web_search tools)
@@ -183,7 +195,7 @@ node scripts/seed-jobroles.mjs
 
 ### zilofinopps — Melhorias
 - Export relatórios PDF/Excel
-- Alertas de budget (SAP Alert Notification Service)
+- Alertas de budget por email (SAP Alert Notification Service)
 - Previsão de consumo mensal
 
 ### Infraestrutura

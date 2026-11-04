@@ -1,0 +1,9 @@
+Analise a planilha Excel anexada com os pedidos de vendas.
+
+Responda a três perguntas:
+
+1. Qual é o valor total das vendas? Calcule multiplicando a quantidade pelo preço unitário de cada pedido.
+2. Qual produto teve o maior valor total de vendas?
+3. Algum cliente teve problema de entrega? Identifique o cliente e explique brevemente o problema.
+
+Apresente os resultados de forma simples, em português.

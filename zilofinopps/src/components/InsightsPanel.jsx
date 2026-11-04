@@ -38,6 +38,7 @@ export default function InsightsPanel({ open, onClose, contextData, contextLabel
   const [input, setInput]       = useState('')
   const [loading, setLoading]   = useState(false)
   const [orchId, setOrchId]     = useState(null)
+  const [convId, setConvId]     = useState(null)
   const [streamingText, setStreamingText] = useState('')
   const bottomRef = useRef(null)
   const textareaRef = useRef(null)
@@ -51,6 +52,12 @@ export default function InsightsPanel({ open, onClose, contextData, contextLabel
   useEffect(() => {
     if (open) setTimeout(() => textareaRef.current?.focus(), 100)
   }, [open])
+
+  // Reset conversation when context changes (new tab = new conversation)
+  useEffect(() => {
+    setConvId(null)
+    setMessages([])
+  }, [contextLabel]) // eslint-disable-line
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -73,6 +80,8 @@ export default function InsightsPanel({ open, onClose, contextData, contextLabel
         orchestrationId: orchId,
         context: ctx,
         onDelta: chunk => { full += chunk; setStreamingText(full) },
+        onConversationCreated: id => setConvId(id),
+        conversationId: convId,
         onDone: () => {},
       })
       setMessages(prev => [...prev, { role: 'assistant', content: full }])

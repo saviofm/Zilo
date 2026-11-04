@@ -4,8 +4,9 @@ export const NAV_ITEMS = [
   { id: 'byModel',    label: 'Por Modelo',        icon: '🤖' },
   { id: 'byPersona',  label: 'Por Perfil IA',     icon: '🎭' },
   { id: 'byJobRole',  label: 'Por Cargo',         icon: '👥' },
-  { id: 'drilldown',  label: 'Drill-down',        icon: '🔍' },
-  { id: 'simulator',  label: 'Simulador CU',      icon: '🧮' },
+  { id: 'drilldown',  label: 'Visão por Usuários', icon: '🔍' },
+  { id: 'simulator',         label: 'Simulador',           icon: '🧮' },
+  { id: 'simuladorAvancado', label: 'Simulador Avançado',  icon: '⚙️' },
 ]
 
 export default function Sidebar({ active, onSelect }) {
@@ -17,7 +18,7 @@ export default function Sidebar({ active, onSelect }) {
     }}>
       {/* Logo */}
       <div style={{ padding: '20px 16px 16px', borderBottom: '1px solid var(--sidebar-border)' }}>
-        <img src="/LOGO_COMPLETO.png" alt="Zilo" style={{ height: 36, objectFit: 'contain', display: 'block' }} />
+        <img src="/LOGO_COMPLETO.png" alt="Zilo" style={{ height: 36, objectFit: 'contain', display: 'block', filter: 'brightness(0) invert(1)' }} />
         <div style={{ marginTop: 6, fontSize: 10, fontWeight: 700, color: 'var(--accent)', letterSpacing: '0.1em', textTransform: 'uppercase' }}>
           FinOps Dashboard
         </div>

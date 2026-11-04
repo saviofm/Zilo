@@ -177,18 +177,35 @@ export async function createOrchestrationClient(orch) {
 
   return {
     async complete({ messages = [], stream = false }) {
-      let request;
+      // grounding_input_variable_1: only the user's actual prompt — NOT file content.
+      // File content goes in messagesHistory. Passing large file text here exceeds AI Core limits.
+      const lastUser = [...messages].reverse().find(m => m.role === 'user');
+      const rawContent = lastUser?.content ?? '';
+      const lastUserMsg = Array.isArray(rawContent)
+        ? (rawContent.find(b => b.type === 'text')?.text ?? '')   // first text block = user prompt only
+        : String(rawContent);
 
-      if (orch.groundingEnabled) {
-        const currentUserMsg = [...messages].reverse().find(m => m.role === 'user')?.content ?? '';
-        const history = messages.slice(0, -1);
-        request = {
-          placeholderValues: { grounding_input_variable_1: currentUserMsg },
-          ...(history.length && { messagesHistory: history }),
-        };
-      } else {
-        request = messages.length ? { messagesHistory: messages } : {};
-      }
+      // For grounding profiles: flatten any array content to plain string (AI Core grounding
+      // rejects array content in messagesHistory), and strip tool_use/tool_result turns.
+      const flattenContent = (c) => Array.isArray(c)
+        ? c.filter(b => b.type === 'text').map(b => b.text).join('\n')
+        : c;
+
+      const safeMessages = orch.groundingEnabled
+        ? messages
+            .filter(m => {
+              const c = m.content
+              if (Array.isArray(c)) return !c.some(b => b.type === 'tool_use' || b.type === 'tool_result')
+              return m.role !== 'tool'
+            })
+            .map(m => ({ ...m, content: flattenContent(m.content) }))
+        : messages;
+
+      const request = {
+        ...(safeMessages.length ? { messagesHistory: safeMessages } : {}),
+        ...(orch.groundingEnabled && { placeholderValues: { grounding_input_variable_1: lastUserMsg } }),
+      };
+
 
       const hasRef = typeof config === 'object' && !('modules' in config) && 'id' in config;
       log.debug({ deploymentId: DEPLOYMENT_ID, hasConfigRef: hasRef, stream }, 'orchestration request');
@@ -229,7 +246,20 @@ export async function createOrchestrationClient(orch) {
           log.info('config_ref failed — retrying with inline moduleConfigJson');
           try {
             const fallbackClient = new OrchestrationClient(orch.moduleConfigJson, deploymentConfig, destination);
-            return await tryComplete(fallbackClient, stream);
+            // Inline JSON config: AI Core messages_history requires string content, not arrays.
+            // Flatten any array content before sending.
+            const flatMessages = (request.messagesHistory ?? []).map(m => ({
+              ...m,
+              content: Array.isArray(m.content)
+                ? m.content.filter(b => b.type === 'text').map(b => b.text).join('\n')
+                : m.content,
+            }));
+            const flatRequest = { ...request, messagesHistory: flatMessages };
+const fallbackAttempt = async (c, useStream) => {
+              if (useStream) return { streamResp: await c.stream(flatRequest) };
+              return { data: await c.chatCompletion(flatRequest) };
+            };
+            return await fallbackAttempt(fallbackClient, false);
           } catch (err2) {
             const body2 = err2.response?.data ?? err2.cause?.response?.data ?? null;
             log.error({ status: err2.response?.status ?? 500, body: body2, err: err2.message }, 'inline fallback also failed');

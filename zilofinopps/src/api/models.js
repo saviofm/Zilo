@@ -19,7 +19,7 @@ export async function fetchJobRoles() {
 }
 
 export async function fetchOrchestrations() {
-  const res = await fetch(`${ADMIN}/OrchestrationConfig?$filter=isActive eq true&$orderby=sortOrder&$expand=model($select=id,displayName,inputCUPer1k,outputCUPer1k)`, {
+  const res = await fetch(`${ADMIN}/OrchestrationConfig?$filter=isActive eq true&$orderby=sortOrder&$select=id,name,orchestrationCUPerCall,sortOrder&$expand=model($select=id,displayName,inputCUPer1k,outputCUPer1k)`, {
     headers: { Accept: 'application/json' },
   })
   if (!res.ok) return []
